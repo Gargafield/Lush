@@ -1,4 +1,4 @@
-use super::characteristics::Characteristics;
+use super::characteristics::FileCharacteristics;
 
 /// # II.25.2.2 PE file header 
 /// 
@@ -20,7 +20,7 @@ pub struct PeHeader {
     pub pointer_to_symbol_table: u32,
     pub number_of_symbols: u32,
     pub optional_header_size: u16,
-    pub characteristics: Characteristics,
+    pub characteristics: FileCharacteristics,
 }
 
 impl PeHeader {
@@ -32,7 +32,7 @@ impl PeHeader {
             pointer_to_symbol_table: u32::from_le_bytes(slice[8..12].try_into().unwrap()),
             number_of_symbols: u32::from_le_bytes(slice[12..16].try_into().unwrap()),
             optional_header_size: u16::from_le_bytes(slice[16..18].try_into().unwrap()),
-            characteristics: Characteristics::new(u16::from_le_bytes(slice[18..20].try_into().unwrap())),
+            characteristics: FileCharacteristics::new(u16::from_le_bytes(slice[18..20].try_into().unwrap())),
         }
     }
 }

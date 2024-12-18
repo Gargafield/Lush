@@ -4,6 +4,7 @@ pub mod pe_optional_header;
 pub mod standard_fields;
 pub mod nt_specific_fields;
 pub mod data_directories;
+pub mod section_header;
 
 use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
 
@@ -95,6 +96,18 @@ impl PeImage {
         let mut buffer = vec![0u8; header.optional_header_size as usize];
         self.buffer.read_exact(&mut buffer)?;
         Ok(PeOptionalHeader::from(&buffer[..224].try_into().unwrap()))
+    }
+
+    /// # II.25.3 Section headers 
+    /// See [`SectionHeader`] struct for more information.
+    fn read_section_header(&mut self, header: &PeHeader) -> Result<Vec<section_header::SectionHeader>, std::io::Error> {
+        let mut sections = Vec::with_capacity(header.number_of_sections as usize);
+        for _ in 0..header.number_of_sections {
+            let mut buffer = [0u8; 40];
+            self.buffer.read_exact(&mut buffer)?;
+            sections.push(section_header::SectionHeader::from(&buffer));
+        }
+        Ok(sections)
     }
 }
 
