@@ -38,6 +38,10 @@ impl MetadataHeader {
         buffer.read_exact(&mut header)?;
 
         let signature = u32::from_le_bytes(header[0..4].try_into().unwrap());
+
+        // See Description of Signature field in the table above
+        assert!(signature == 0x424A5342, "Invalid metadata signature: 0x{:X}", signature);
+
         let major_version = u16::from_le_bytes(header[4..6].try_into().unwrap());
         let minor_version = u16::from_le_bytes(header[6..8].try_into().unwrap());
         let reserved = u32::from_le_bytes(header[8..12].try_into().unwrap());
