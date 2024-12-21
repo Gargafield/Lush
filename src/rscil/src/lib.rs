@@ -10,7 +10,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
+        let mut image = pe_image::PeImage::open("tests/HelloWorld.exe").unwrap();
+        image.read().unwrap();
     }
 }

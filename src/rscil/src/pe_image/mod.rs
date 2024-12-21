@@ -1,16 +1,20 @@
-pub mod characteristics;
-pub mod pe_header;
-pub mod pe_optional_header; 
-pub mod standard_fields;
-pub mod nt_specific_fields;
-pub mod data_directories;
-pub mod section_header;
-pub mod cli_header;
+mod characteristics;
+mod pe_header;
+mod pe_optional_header; 
+mod standard_fields;
+mod nt_specific_fields;
+mod data_directories;
+mod section_header;
+mod cli_header;
+mod metadata_header;
 
 use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
 
-use pe_header::PeHeader;
-use pe_optional_header::PeOptionalHeader;
+pub use cli_header::CliHeader;
+pub use metadata_header::MetadataHeader;
+pub use pe_header::PeHeader;
+pub use pe_optional_header::PeOptionalHeader;
+pub use section_header::SectionHeader;
 
 pub struct PeImage {
     filename : String,
@@ -56,7 +60,21 @@ impl PeImage {
         let file = File::open(filename)?;
         let buffer = BufReader::new(file);
         Ok(PeImage::new(filename, buffer))
-    }    
+    }
+
+    pub fn read(&mut self) -> Result<MetadataHeader, std::io::Error> {
+        self.read_dos_stub()?;
+        let header = self.read_pe_header()?;
+
+        // See Description of Machine field at II.25.2.2 PE file header
+        assert!(header.machine == 0x14c, "Invalid machine type");
+
+        let optional_header = self.read_pe_optional_header(&header)?;
+        let sections = self.read_section_header(&header)?;
+        let cli_header = self.read_cli_header(&optional_header, &sections)?;
+        let metadata_header = self.read_metadata_header(&cli_header, &sections)?;
+        Ok(metadata_header)
+    }
 
     /// # II.25.2.1 MS-DOS header
     /// The PE format starts with an MS-DOS stub of exactly the following **128** bytes to be placed at the front 
@@ -109,7 +127,40 @@ impl PeImage {
         }
         Ok(sections)
     }
+
+    /// # II.25.3.3 CLI header 
+    /// See [`CliHeader`] struct for more information.
+    fn read_cli_header(&mut self, optional_header: &PeOptionalHeader, sections: &Vec<SectionHeader>) -> Result<CliHeader, std::io::Error> {
+        self.seek_rva(sections, optional_header.data_directories.cli_header.rva)?;
+        let mut buffer = [0u8; 72];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(CliHeader::from(&buffer))
+    }
+
+    /// ## II.24.2.1 Metadata root
+    /// See [`MetadataHeader`] struct for more information.
+    fn read_metadata_header(&mut self, cli_header: &CliHeader, sections: &Vec<SectionHeader>) -> Result<MetadataHeader, std::io::Error> {
+        self.seek_rva(sections, cli_header.meta_data.rva)?;
+        MetadataHeader::from(&mut self.buffer)
+    }
+
+    /// II.25 File format extensions to PE 
+    /// 
+    /// [...]
+    /// 
+    /// The PE format frequently uses the term RVA (Relative Virtual Address). An RVA is the address of an 
+    /// item once loaded into memory, with the base address of the image file subtracted from it (i.e., the offset 
+    /// from the base address where the file is loaded). The RVA of an item will almost always differ from its 
+    /// position within the file on disk. To compute the file position of an item with RVA r, search all the 
+    /// sections in the PE file to find the section with RVA s, length l and file position p in which the RVA 
+    /// lies, ie s  r < s+l. The file position of the item is then given by p+(r-s). 
+    fn seek_rva(&mut self, sections: &Vec<SectionHeader>, rva: u32) -> Result<(), std::io::Error> {
+        for section in sections {
+            if rva >= section.virtual_address && rva < section.virtual_address + section.virtual_size {
+                self.buffer.seek(SeekFrom::Start(section.pointer_to_raw_data as u64 + (rva - section.virtual_address) as u64))?;
+                return Ok(());
+            }
+        }
+        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "RVA not found in any section"))
+    }
 }
-
-
-
