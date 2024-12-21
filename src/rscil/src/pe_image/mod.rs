@@ -75,7 +75,6 @@ impl PeImage {
         // Check if the PE signature is present
         let mut signature = [0u8; 4];
         self.buffer.read_exact(&mut signature)?;
-        self.buffer.seek(SeekFrom::Start(lfanew as u64))?;
         if signature != PE_SIGNATURE {
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid PE signature"));
         }
