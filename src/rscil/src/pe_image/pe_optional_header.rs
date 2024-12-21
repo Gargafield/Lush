@@ -17,6 +17,8 @@ pub struct PeOptionalHeader {
 }
 
 impl PeOptionalHeader {
+    pub const SIZE: usize = 224;
+
     pub fn from(slice: &[u8; 224]) -> PeOptionalHeader {
         PeOptionalHeader {
             standard_fields: StandardFields::from(&slice[0..28].try_into().unwrap()),
