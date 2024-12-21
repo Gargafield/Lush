@@ -22,16 +22,16 @@ use super::characteristics::SectionCharacteristics;
 /// | 34     | 2    | NumberOfLinenumbers   | Should be 0 (§II.24.1). |
 /// | 36     | 4    | Characteristics       | Flags describing section's characteristics; see below. |
 pub struct SectionHeader {
-    name: [u8; 8],
-    virtual_size: u32,
-    virtual_address: u32,
-    size_of_raw_data: u32,
-    pointer_to_raw_data: u32,
-    pointer_to_relocations: u32,
-    pointer_to_linenumbers: u32,
-    number_of_relocations: u16,
-    number_of_linenumbers: u16,
-    characteristics: SectionCharacteristics,
+    pub name: [u8; 8],
+    pub virtual_size: u32,
+    pub virtual_address: u32,
+    pub size_of_raw_data: u32,
+    pub pointer_to_raw_data: u32,
+    pub pointer_to_relocations: u32,
+    pub pointer_to_linenumbers: u32,
+    pub number_of_relocations: u16,
+    pub number_of_linenumbers: u16,
+    pub characteristics: SectionCharacteristics,
 }
 
 impl SectionHeader {

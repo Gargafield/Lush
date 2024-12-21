@@ -20,15 +20,15 @@
 /// `mscoree` entry point will use the module handle to load the metadata from the image, and invoke the 
 /// entry point specified in vthe CLI header.
 pub struct StandardFields {
-    magic: u16,
-    l_major: u8,
-    l_minor: u8,
-    code_size: u32,
-    initialized_data_size: u32,
-    uninitialized_data_size: u32,
-    entry_point_rva: u32,
-    base_of_code: u32,
-    base_of_data: u32,
+    pub magic: u16,
+    pub l_major: u8,
+    pub l_minor: u8,
+    pub code_size: u32,
+    pub initialized_data_size: u32,
+    pub uninitialized_data_size: u32,
+    pub entry_point_rva: u32,
+    pub base_of_code: u32,
+    pub base_of_data: u32,
 }
 
 impl StandardFields {

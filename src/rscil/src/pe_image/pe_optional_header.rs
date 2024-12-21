@@ -11,9 +11,9 @@ use super::{data_directories::DataDirectories, nt_specific_fields::NtSpecificFie
 /// | 28     | 68   | NT-specific fields  | These include additional fields to support specific features of Windows, see II.25.2.3.2. |
 /// | 96     | 128  | Data directories    | These fields are address/size pairs for special tables, found in the image file (for example, Import Table and Export Table). |
 pub struct PeOptionalHeader {
-    standard_fields: StandardFields,
-    nt_specific_fields: NtSpecificFields,
-    data_directories: DataDirectories,
+    pub standard_fields: StandardFields,
+    pub nt_specific_fields: NtSpecificFields,
+    pub data_directories: DataDirectories,
 }
 
 impl PeOptionalHeader {

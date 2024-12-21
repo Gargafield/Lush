@@ -26,22 +26,22 @@
 /// The tables pointed to by the directory entries are stored in one of the PE file’s sections; these sections 
 /// themselves are described by section headers.  
 pub struct DataDirectories {
-    export_table: DataDirectory,
-    import_table: DataDirectory,
-    resource_table: DataDirectory,
-    exception_table: DataDirectory,
-    certificate_table: DataDirectory,
-    base_relocation_table: DataDirectory,
-    debug: DataDirectory,
-    copyright: DataDirectory,
-    global_ptr: DataDirectory,
-    tls_table: DataDirectory,
-    load_config_table: DataDirectory,
-    bound_import: DataDirectory,
-    iat: DataDirectory,
-    delay_import_descriptor: DataDirectory,
-    cli_header: DataDirectory,
-    reserved: DataDirectory,
+    pub export_table: DataDirectory,
+    pub import_table: DataDirectory,
+    pub resource_table: DataDirectory,
+    pub exception_table: DataDirectory,
+    pub certificate_table: DataDirectory,
+    pub base_relocation_table: DataDirectory,
+    pub debug: DataDirectory,
+    pub copyright: DataDirectory,
+    pub global_ptr: DataDirectory,
+    pub tls_table: DataDirectory,
+    pub load_config_table: DataDirectory,
+    pub bound_import: DataDirectory,
+    pub iat: DataDirectory,
+    pub delay_import_descriptor: DataDirectory,
+    pub cli_header: DataDirectory,
+    pub reserved: DataDirectory,
 }
 
 impl DataDirectories {
@@ -72,8 +72,8 @@ impl DataDirectories {
 }
 
 pub struct DataDirectory {
-    rva: u32,
-    size: u32,
+    pub rva: u32,
+    pub size: u32,
 }
 
 impl DataDirectory {
