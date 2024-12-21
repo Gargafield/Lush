@@ -81,14 +81,12 @@ impl PeImage {
     /// of the module. At offset `0x3c` in the DOS header is a 4-byte unsigned integer offset, `lfanew`, to the PE 
     /// signature (shall be "PE\0\0"), immediately followed by the PE file header.
     fn read_dos_stub(&mut self) -> Result<(), std::io::Error> {
-        let mut header = [0u8; 128];
+        let mut header = [0u8; DOS_STUB_SIZE];
         self.buffer.read_exact(&mut header)?;
 
         if header[..0x3c] != DOS_STUB[..0x3c] || header[0x40..] != DOS_STUB[0x40..] {
             return Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid DOS header"));
         }
-
-        let lfanew = u32::from_le_bytes(header[0x3c..0x40].try_into().unwrap());
 
         // Check if the PE signature is present
         let mut signature = [0u8; 4];
