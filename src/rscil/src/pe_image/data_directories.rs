@@ -26,48 +26,75 @@
 /// The tables pointed to by the directory entries are stored in one of the PE file’s sections; these sections 
 /// themselves are described by section headers.  
 pub struct DataDirectories {
-    export_table: (u32, u32),
-    import_table: (u32, u32),
-    resource_table: (u32, u32),
-    exception_table: (u32, u32),
-    certificate_table: (u32, u32),
-    base_relocation_table: (u32, u32),
-    debug: (u32, u32),
-    copyright: (u32, u32),
-    global_ptr: (u32, u32),
-    tls_table: (u32, u32),
-    load_config_table: (u32, u32),
-    bound_import: (u32, u32),
-    iat: (u32, u32),
-    delay_import_descriptor: (u32, u32),
-    cli_header: (u32, u32),
-    reserved: (u32, u32),
+    export_table: DataDirectory,
+    import_table: DataDirectory,
+    resource_table: DataDirectory,
+    exception_table: DataDirectory,
+    certificate_table: DataDirectory,
+    base_relocation_table: DataDirectory,
+    debug: DataDirectory,
+    copyright: DataDirectory,
+    global_ptr: DataDirectory,
+    tls_table: DataDirectory,
+    load_config_table: DataDirectory,
+    bound_import: DataDirectory,
+    iat: DataDirectory,
+    delay_import_descriptor: DataDirectory,
+    cli_header: DataDirectory,
+    reserved: DataDirectory,
 }
 
 impl DataDirectories {
-    fn read_pair(slice: &[u8], start: usize) -> (u32, u32) {
-        (u32::from_le_bytes(slice[start..start+4].try_into().unwrap()),
-         u32::from_le_bytes(slice[start..start+8].try_into().unwrap()))
+    fn read_directory(slice: &[u8], start: usize) -> DataDirectory {
+        DataDirectory::from(&slice[start..start+8].try_into().unwrap())
     }
 
     pub fn from(slice: &[u8; 128]) -> DataDirectories {
         DataDirectories {
-            export_table: Self::read_pair(slice, 0),
-            import_table: Self::read_pair(slice, 8),
-            resource_table: Self::read_pair(slice, 16),
-            exception_table: Self::read_pair(slice, 24),
-            certificate_table: Self::read_pair(slice, 32),
-            base_relocation_table: Self::read_pair(slice, 40),
-            debug: Self::read_pair(slice, 48),
-            copyright: Self::read_pair(slice, 56),
-            global_ptr: Self::read_pair(slice, 64),
-            tls_table: Self::read_pair(slice, 72),
-            load_config_table: Self::read_pair(slice, 80),
-            bound_import: Self::read_pair(slice, 88),
-            iat: Self::read_pair(slice, 96),
-            delay_import_descriptor: Self::read_pair(slice, 104),
-            cli_header: Self::read_pair(slice, 112),
-            reserved: Self::read_pair(slice, 120),
+            export_table: Self::read_directory(slice, 0),
+            import_table: Self::read_directory(slice, 8),
+            resource_table: Self::read_directory(slice, 16),
+            exception_table: Self::read_directory(slice, 24),
+            certificate_table: Self::read_directory(slice, 32),
+            base_relocation_table: Self::read_directory(slice, 40),
+            debug: Self::read_directory(slice, 48),
+            copyright: Self::read_directory(slice, 56),
+            global_ptr: Self::read_directory(slice, 64),
+            tls_table: Self::read_directory(slice, 72),
+            load_config_table: Self::read_directory(slice, 80),
+            bound_import: Self::read_directory(slice, 88),
+            iat: Self::read_directory(slice, 96),
+            delay_import_descriptor: Self::read_directory(slice, 104),
+            cli_header: Self::read_directory(slice, 112),
+            reserved: Self::read_directory(slice, 120),
+        }
+    }
+}
+
+pub struct DataDirectory {
+    rva: u32,
+    size: u32,
+}
+
+impl DataDirectory {
+    pub fn new(rva: u32, size: u32) -> DataDirectory {
+        DataDirectory {
+            rva,
+            size,
+        }
+    }
+
+    pub fn from(slice: &[u8; 8]) -> DataDirectory {
+        DataDirectory {
+            rva: u32::from_le_bytes(slice[0..4].try_into().unwrap()),
+            size: u32::from_le_bytes(slice[4..8].try_into().unwrap()),
+        }
+    }
+
+    pub fn from_slice(slice: &[u8]) -> DataDirectory {
+        DataDirectory {
+            rva: u32::from_le_bytes(slice[0..4].try_into().unwrap()),
+            size: u32::from_le_bytes(slice[4..8].try_into().unwrap()),
         }
     }
 }
