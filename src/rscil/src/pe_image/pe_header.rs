@@ -26,7 +26,7 @@ pub struct PeHeader {
 impl PeHeader {
     pub fn from(slice: &[u8; 20]) -> PeHeader {
         PeHeader {
-            machine: 0x14c,
+            machine: u16::from_le_bytes(slice[0..2].try_into().unwrap()),
             number_of_sections: u16::from_le_bytes(slice[2..4].try_into().unwrap()),
             time_date_stamp: u32::from_le_bytes(slice[4..8].try_into().unwrap()),
             pointer_to_symbol_table: u32::from_le_bytes(slice[8..12].try_into().unwrap()),
