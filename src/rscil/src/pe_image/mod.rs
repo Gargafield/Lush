@@ -5,6 +5,7 @@ pub mod standard_fields;
 pub mod nt_specific_fields;
 pub mod data_directories;
 pub mod section_header;
+pub mod cli_header;
 
 use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
 
