@@ -20,7 +20,7 @@
 /// | 184    | 8    | Bound Import            | Always 0 (§II.24.1). |
 /// | 192    | 8    | IAT                     | RVA and Size of Import Address Table, (§II.25.3.1). |
 /// | 200    | 8    | Delay Import Descriptor | Always 0 (§II.24.1). |
-/// | 208    | 8    | CLI Header              | CLI Header with directories for runtime data, (§II.25.3.1). |
+/// | 208    | 8    | CLI Header              | CLI Header with directories for runtime data, ([`CliHeader`]). |
 /// | 216    | 8    | Reserved                | Always 0 (§II.24.1). |
 /// 
 /// The tables pointed to by the directory entries are stored in one of the PE file’s sections; these sections 
