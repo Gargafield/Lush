@@ -63,6 +63,8 @@ impl PeImage {
     }
 
     pub fn read(&mut self) -> Result<MetadataHeader, std::io::Error> {
+        self.buffer.seek(SeekFrom::Start(0))?;
+
         self.read_dos_stub()?;
         let header = self.read_pe_header()?;
 
