@@ -1,5 +1,7 @@
 use std::{fs::File, io::{BufRead, BufReader, Read}};
 
+use crate::pe_image::bufreader_extension::BufReaderExtension;
+
 /// # II.24.2 File headers
 /// ## II.24.2.1 Metadata root
 /// 
@@ -34,18 +36,15 @@ pub struct MetadataHeader {
 
 impl MetadataHeader {
     pub fn from(buffer: &mut BufReader<File>) -> Result<MetadataHeader, std::io::Error> {
-        let mut header = [0u8; 16];
-        buffer.read_exact(&mut header)?;
-
-        let signature = u32::from_le_bytes(header[0..4].try_into().unwrap());
+        let signature = buffer.read_u32()?;
 
         // See Description of Signature field in the table above
         assert!(signature == 0x424A5342, "Invalid metadata signature: 0x{:X}", signature);
 
-        let major_version = u16::from_le_bytes(header[4..6].try_into().unwrap());
-        let minor_version = u16::from_le_bytes(header[6..8].try_into().unwrap());
-        let reserved = u32::from_le_bytes(header[8..12].try_into().unwrap());
-        let length = u32::from_le_bytes(header[12..16].try_into().unwrap());
+        let major_version = buffer.read_u16()?;
+        let minor_version = buffer.read_u16()?;
+        let reserved = buffer.read_u32()?;
+        let length = buffer.read_u32()?;
 
         let mut version = vec![0u8; length as usize];
         buffer.read_exact(&mut version)?;
@@ -54,13 +53,8 @@ impl MetadataHeader {
         let mut padding = vec![0u8; (length % 4) as usize];
         buffer.read_exact(&mut padding)?;
 
-        let mut flags = [0u8; 2];
-        buffer.read_exact(&mut flags)?;
-        let flags = u16::from_le_bytes(flags);
-
-        let mut streams = [0u8; 2];
-        buffer.read_exact(&mut streams)?;
-        let streams = u16::from_le_bytes(streams);
+        let flags = buffer.read_u16()?;
+        let streams = buffer.read_u16()?;
 
         let mut stream_headers = Vec::with_capacity(streams as usize);
         for _ in 0..streams {
@@ -99,19 +93,19 @@ pub struct StreamHeader {
 
 impl StreamHeader {
     pub fn from(buffer: &mut BufReader<File>) -> Result<StreamHeader, std::io::Error> {
-        let mut header = [0u8; 8];
-        buffer.read_exact(&mut header)?;
-
-        let offset = u32::from_le_bytes(header[0..4].try_into().unwrap());
-        let size = u32::from_le_bytes(header[4..8].try_into().unwrap());
+        let offset = buffer.read_u32()?;
+        let size = buffer.read_u32()?;
 
         let mut name = Vec::new();
         buffer.read_until(0, &mut name)?;
-        let name = String::from_utf8(name).unwrap();
-
-        let padding = (4 - (name.len() % 4)) % 4;
+        
+        // Padding to the next 4-byte boundary
+        let padding = 4 - (name.len() % 4);
         let mut padding = vec![0u8; padding];
         buffer.read_exact(&mut padding)?;
+        
+        name.pop(); // Remove the null terminator
+        let name = String::from_utf8(name).unwrap();
 
         Ok(StreamHeader {
             offset,

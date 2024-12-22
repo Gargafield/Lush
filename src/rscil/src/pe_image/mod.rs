@@ -7,14 +7,21 @@ mod data_directories;
 mod section_header;
 mod cli_header;
 mod metadata_header;
+mod bufreader_extension;
+mod streams;
 
 use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
 
 pub use cli_header::CliHeader;
 pub use metadata_header::MetadataHeader;
+use metadata_header::StreamHeader;
 pub use pe_header::PeHeader;
 pub use pe_optional_header::PeOptionalHeader;
 pub use section_header::SectionHeader;
+pub use bufreader_extension::BufReaderExtension;
+use streams::Streams;
+
+use crate::{Table, TableKind};
 
 pub struct PeImage {
     filename : String,
@@ -75,6 +82,21 @@ impl PeImage {
         let sections = self.read_section_header(&header)?;
         let cli_header = self.read_cli_header(&optional_header, &sections)?;
         let metadata_header = self.read_metadata_header(&cli_header, &sections)?;
+        let streams = self.read_streams(
+            Self::get_address(&sections, cli_header.meta_data.rva),
+            &metadata_header.stream_headers
+        )?;
+
+        let assembly = match streams.metadata.tables[&TableKind::Assembly] {
+            Table::Assembly(assembly) => assembly.expect("Assembly not found"),
+            _ => panic!("Invalid assembly table")
+        }; 
+
+        println!("Assembly table: {:?}", assembly);
+
+        let name = streams.strings.get(assembly.name.0 as u32).unwrap();
+        println!("Assembly name: {}", name);
+
         Ok(metadata_header)
     }
 
@@ -131,7 +153,7 @@ impl PeImage {
     /// # II.25.3.3 CLI header 
     /// See [`CliHeader`] struct for more information.
     fn read_cli_header(&mut self, optional_header: &PeOptionalHeader, sections: &Vec<SectionHeader>) -> Result<CliHeader, std::io::Error> {
-        self.seek_rva(sections, optional_header.data_directories.cli_header.rva)?;
+        self.seek_rva(sections, optional_header.data_directories.cli_header.rva);
         let mut buffer = [0u8; 72];
         self.buffer.read_exact(&mut buffer)?;
         Ok(CliHeader::from(&buffer))
@@ -140,8 +162,14 @@ impl PeImage {
     /// ## II.24.2.1 Metadata root
     /// See [`MetadataHeader`] struct for more information.
     fn read_metadata_header(&mut self, cli_header: &CliHeader, sections: &Vec<SectionHeader>) -> Result<MetadataHeader, std::io::Error> {
-        self.seek_rva(sections, cli_header.meta_data.rva)?;
+        self.seek_rva(sections, cli_header.meta_data.rva);
         MetadataHeader::from(&mut self.buffer)
+    }
+
+    /// # II.24.2.2 Stream header
+    /// See [`Streams`] struct for more information.
+    fn read_streams(&mut self, root_address: u64, headers: &Vec<StreamHeader>) -> Result<streams::Streams, std::io::Error> {
+        Streams::from(&mut self.buffer, root_address, headers)
     }
 
     /// II.25 File format extensions to PE 
@@ -154,13 +182,16 @@ impl PeImage {
     /// position within the file on disk. To compute the file position of an item with RVA r, search all the 
     /// sections in the PE file to find the section with RVA s, length l and file position p in which the RVA 
     /// lies, ie s  r < s+l. The file position of the item is then given by p+(r-s). 
-    fn seek_rva(&mut self, sections: &Vec<SectionHeader>, rva: u32) -> Result<(), std::io::Error> {
+    fn seek_rva(&mut self, sections: &Vec<SectionHeader>, rva: u32) {
+        self.buffer.seek(SeekFrom::Start(Self::get_address(sections, rva))).unwrap();
+    }
+
+    fn get_address(sections: &Vec<SectionHeader>, rva: u32) -> u64 {
         for section in sections {
             if rva >= section.virtual_address && rva < section.virtual_address + section.virtual_size {
-                self.buffer.seek(SeekFrom::Start(section.pointer_to_raw_data as u64 + (rva - section.virtual_address) as u64))?;
-                return Ok(());
+                return section.pointer_to_raw_data as u64 + (rva - section.virtual_address) as u64;
             }
         }
-        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "RVA not found in any section"))
+        panic!("RVA not found in any section");
     }
 }

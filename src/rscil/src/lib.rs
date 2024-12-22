@@ -1,4 +1,8 @@
 pub mod pe_image;
+pub mod metadata;
+
+pub use metadata::*;
+pub use pe_image::*;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
