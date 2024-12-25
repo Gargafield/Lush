@@ -218,7 +218,7 @@ impl UserStringStream {
 pub struct MetadataStream {
     pub major_version: u8,
     pub minor_version: u8,
-    pub heap_sizes: u8,
+    pub heap_sizes: HeapSizes,
     pub valid: u64,
     pub sorted: u64,
     pub rows: Vec<u32>,
@@ -234,19 +234,19 @@ impl MetadataStream {
         assert_eq!(major_version, 2, "Invalid major version");
         assert_eq!(minor_version, 0, "Invalid minor version");
         
-        let heap_sizes = buffer.read_u8()?;
+        let heap_sizes = HeapSizes::from(buffer.read_u8()?);
         buffer.read_u8()?; // Reserved
         let valid = buffer.read_u64()?;
         let sorted = buffer.read_u64()?;
 
         let mut rows = Vec::new();
-        let mut tables = HashMap::new();
-        
-
         let number_of_tables = valid.count_ones();
         for _ in 0..number_of_tables {
             rows.push(buffer.read_u32()?);
         }
+
+        let mut tables = HashMap::new();
+        
 
         let table_kinds = TableKind::from_bitmask(valid);
         for (i, kind) in table_kinds.iter().enumerate() {
@@ -265,3 +265,55 @@ impl MetadataStream {
     }
 }
 
+/// # II.24.2.6 #~ stream 
+/// [...]
+/// 
+/// The HeapSizes field is a bitvector that encodes the width of indexes into the various heaps.  If bit 0 is 
+/// set, indexes into the “#String” heap are 4 bytes wide; if bit 1 is set, indexes into the “#GUID” heap are 
+/// 4 bytes wide; if bit 2 is set, indexes into the “#Blob” heap are 4 bytes wide.  Conversely, if the 
+/// HeapSize bit for a particular heap is not set, indexes into that heap are 2 bytes wide. 
+/// | Heap size flag | Description | 
+/// | -------------- | ----------- |
+/// | `0x01`         | Size of "#String" stream >= 216. |
+/// | `0x02`         | Size of "#GUID" stream >= 216. |
+/// | `0x04`         | Size of "#Blob" stream >= 216. |
+pub struct HeapSizes(u8);
+
+impl HeapSizes {
+    pub const STRING_FLAG: u8 = 0b0000_0001;
+    pub const GUID_FLAG: u8 = 0b0000_0010;
+    pub const BLOB_FLAG: u8 = 0b0000_0100;
+
+    pub fn from(value: u8) -> HeapSizes {
+        HeapSizes(value)
+    }
+
+    pub fn string_size(&self) -> usize {
+        if self.check_flag(HeapSizes::STRING_FLAG) {
+            4
+        } else {
+            2
+        }
+    }
+
+    pub fn guid_size(&self) -> usize {
+        if self.check_flag(HeapSizes::GUID_FLAG) {
+            4
+        } else {
+            2
+        }
+    }
+
+    pub fn blob_size(&self) -> usize {
+        if self.check_flag(HeapSizes::BLOB_FLAG) {
+            4
+        } else {
+            2
+        }
+    }
+
+    pub fn check_flag(&self, flag: u8) -> bool {
+        self.0 & flag == flag
+    }
+    
+}
