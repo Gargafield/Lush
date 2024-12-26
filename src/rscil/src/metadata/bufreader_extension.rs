@@ -1,6 +1,6 @@
 use std::{fs::File, io::{BufReader, Read}};
 
-pub trait BufReaderExtension {
+pub(in super) trait BufReaderExtension {
     /// Reads a single byte from the buffer.
     fn read_u8(&mut self) -> Result<u8, std::io::Error>;
 

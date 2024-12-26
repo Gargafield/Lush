@@ -24,7 +24,6 @@ pub use metadata_header::{MetadataHeader, StreamHeader};
 pub use pe_header::PeHeader;
 pub use pe_optional_header::PeOptionalHeader;
 pub use section_header::SectionHeader;
-pub use bufreader_extension::BufReaderExtension;
 pub use streams::Streams;
 pub use image::PeImage;
 pub use parser::PeParser;

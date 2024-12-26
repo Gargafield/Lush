@@ -1,5 +1,7 @@
 use std::{fs::File, io::BufReader};
 
+use metadata::bufreader_extension::BufReaderExtension;
+
 use crate::*;
 
 /// II.22.2 Assembly : 0x20

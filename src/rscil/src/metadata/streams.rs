@@ -1,5 +1,7 @@
 use std::{any::Any, collections::HashMap, fs::File, io::{BufRead, BufReader, Read, Seek}};
 
+use metadata::bufreader_extension::BufReaderExtension;
+
 use crate::*;
 
 /// II.24.2.2 Stream header 

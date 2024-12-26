@@ -1,6 +1,6 @@
 use std::{fs::File, io::{BufRead, BufReader, Read}};
 
-use crate::BufReaderExtension;
+use crate::metadata::bufreader_extension::BufReaderExtension;
 
 /// # II.24.2 File headers
 /// ## II.24.2.1 Metadata root
