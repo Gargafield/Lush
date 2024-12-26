@@ -1,8 +1,6 @@
-pub mod pe_image;
-pub mod metadata;
+mod metadata;
 
 pub use metadata::*;
-pub use pe_image::*;
 
 pub fn add(left: u64, right: u64) -> u64 {
     left + right
@@ -14,7 +12,7 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut image = PeParser::open("tests/HelloWorld.exe")
+        let image = PeParser::open("tests/HelloWorld.exe")
             .and_then(|mut parser| parser.read())
             .unwrap();
 

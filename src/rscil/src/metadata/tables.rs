@@ -1,8 +1,6 @@
 use std::{fs::File, io::BufReader};
 
-use crate::BufReaderExtension;
-
-use super::{BlobIndex, GuidIndex, StringIndex, TableKind};
+use crate::*;
 
 /// II.22.2 Assembly : 0x20
 /// [...]
@@ -93,7 +91,7 @@ table_impl!(MethodDefTable, |buffer: &mut BufReader<File>, row_count: u32| {
     Ok(MethodDefTable(read_rows(buffer, row_count)?))
 });
 
-table_impl!(ModuleTable, |buffer: &mut BufReader<File>, row_count: u32| {
+table_impl!(ModuleTable, |buffer: &mut BufReader<File>, _row_count: u32| {
     Ok(ModuleTable(ModuleRow::read_from(buffer)?))
 });
 

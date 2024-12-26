@@ -2,8 +2,6 @@ use std::{any::Any, collections::HashMap, fs::File, io::{BufRead, BufReader, Rea
 
 use crate::*;
 
-use super::{bufreader_extension::BufReaderExtension, cli_header, metadata_header::StreamHeader, CliHeader};
-
 /// II.24.2.2 Stream header 
 /// 
 /// [...]
@@ -100,14 +98,14 @@ impl StringStream {
 /// # II.22 Metadata logical format: tables 
 /// 
 /// See [`StringStream`].
-pub struct BlobStream(HashMap<u32, Vec<u8>>);
+pub struct BlobStream(pub HashMap<u32, Vec<u8>>);
 
 impl BlobStream {
     pub fn from(buffer: &mut BufReader<File>, header: &StreamHeader) -> Result<BlobStream, std::io::Error> {
         let mut blobs = HashMap::new();
         let mut count = 0;
         while count < header.size {
-            let (length, bytes_read) = BlobStream::read_length(buffer)?;
+            let (length, bytes_read) = read_blob_length(buffer)?;
 
             let mut blob = vec![0u8; length as usize];
             buffer.read_exact(&mut blob).unwrap();
@@ -117,35 +115,35 @@ impl BlobStream {
         }
         Ok(BlobStream(blobs))
     }
+}
 
-    /// # II.24.2.4 #US and #Blob heaps
-    /// 
-    /// [...]
-    /// 
-    /// * If the first one byte of the 'blob' is *0bbbbbbb<sub>2</sub>*, then the rest of the 'blob' contains the *bbbbbbb<sub>2</sub>* bytes of actual data.
-    /// * If the first two bytes of the 'blob' are *10bbbbbb<sub>2</sub>* and *x*, then the rest of the 'blob' contains the (*bbbbbb<sub>2</sub>* << 8 + *x*) bytes of actual data. 
-    /// * If the first four bytes of the 'blob' are *110bbbbb<sub>2</sub>*, *x*, *y*, and *z*, then the rest of the 'blob' contains the (*bbbbb<sub>2</sub>* << 24 + *x* << 16 + *y* << 8 + *z*) bytes of actual data. 
-    ///
-    /// Returns the length of the 'blob' and the number of bytes read from the buffer.
-    pub fn read_length(buffer: &mut BufReader<File>) -> Result<(usize, u32), std::io::Error> {
-        let first = buffer.read_u8()?;
+/// # II.24.2.4 #US and #Blob heaps
+/// 
+/// [...]
+/// 
+/// * If the first one byte of the 'blob' is *0bbbbbbb<sub>2</sub>*, then the rest of the 'blob' contains the *bbbbbbb<sub>2</sub>* bytes of actual data.
+/// * If the first two bytes of the 'blob' are *10bbbbbb<sub>2</sub>* and *x*, then the rest of the 'blob' contains the (*bbbbbb<sub>2</sub>* << 8 + *x*) bytes of actual data. 
+/// * If the first four bytes of the 'blob' are *110bbbbb<sub>2</sub>*, *x*, *y*, and *z*, then the rest of the 'blob' contains the (*bbbbb<sub>2</sub>* << 24 + *x* << 16 + *y* << 8 + *z*) bytes of actual data. 
+///
+/// Returns the length of the 'blob' and the number of bytes read from the buffer.
+fn read_blob_length(buffer: &mut BufReader<File>) -> Result<(usize, u32), std::io::Error> {
+    let first = buffer.read_u8()?;
 
-        if first & 0b1000_0000 == 0 {
-            Ok((first as usize, 1))
-        } else if first & 0b1100_0000 == 0b1000_0000 {
-            let length = ((first & 0b0011_1111) as u32) << 8 + buffer.read_u8()? as u32;
-            Ok((length as usize, 2))
-        } else if first & 0b1110_0000 == 0b1100_0000 {
-            let mut bytes = [0u8; 3];
-            buffer.read_exact(&mut bytes).unwrap();
-            let length = ((first & 0b0001_1111) as u32) << 24
-                + (bytes[0] as u32) << 16
-                + (bytes[1] as u32) << 8
-                + (bytes[2] as u32);
-            Ok((length as usize, 4))
-        } else {
-            Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid blob length"))
-        }
+    if first & 0b1000_0000 == 0 {
+        Ok((first as usize, 1))
+    } else if first & 0b1100_0000 == 0b1000_0000 {
+        let length = ((first & 0b0011_1111) as u32) << 8 + buffer.read_u8()? as u32;
+        Ok((length as usize, 2))
+    } else if first & 0b1110_0000 == 0b1100_0000 {
+        let mut bytes = [0u8; 3];
+        buffer.read_exact(&mut bytes).unwrap();
+        let length = ((first & 0b0001_1111) as u32) << 24
+            + (bytes[0] as u32) << 16
+            + (bytes[1] as u32) << 8
+            + (bytes[2] as u32);
+        Ok((length as usize, 4))
+    } else {
+        Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid blob length"))
     }
 }
 
@@ -163,14 +161,14 @@ impl BlobStream {
 /// # II.22 Metadata logical format: tables 
 /// 
 /// See [`StringStream`].
-pub struct UserStringStream(HashMap<u32, Vec<u16>>);
+pub struct UserStringStream(pub HashMap<u32, Vec<u16>>);
 
 impl UserStringStream {
     pub fn from(buffer: &mut BufReader<File>, header: &StreamHeader) -> Result<UserStringStream, std::io::Error> {
         let mut strings = HashMap::new();
         let mut count = 0;
         while count < header.size {
-            let (length, bytes_read) = BlobStream::read_length(buffer)?;
+            let (length, bytes_read) = read_blob_length(buffer)?;
 
             // Read UTF-16 string
             let mut string = vec![0u16; length / 2];
