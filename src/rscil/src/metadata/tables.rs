@@ -231,16 +231,16 @@ impl TableRow for ConstantRow {
 /// * *Value* (an index into the Blob heap). 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CustomAttributeRow {
-    pub parent: u16,
-    pub type_: u16,
+    pub parent: CodedIndex,
+    pub type_: CodedIndex,
     pub value: BlobIndex,
 }
 
 impl TableRow for CustomAttributeRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<CustomAttributeRow, std::io::Error> {
         Ok(CustomAttributeRow {
-            parent: buffer.read_u16()?,
-            type_: buffer.read_u16()?,
+            parent: CodedIndex::read(buffer, CodedIndexTag::HasCustomAttribute)?,
+            type_: CodedIndex::read(buffer, CodedIndexTag::CustomAttributeType)?,
             value: BlobIndex::read(buffer)?,
         })
     }
@@ -304,7 +304,7 @@ impl TableRow for FieldRow {
 /// call to a method with a VARARG signature, even when it is defined in the same module as the call site.)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MemberRefRow {
-    pub class: u16,
+    pub class: CodedIndex,
     pub name: StringIndex,
     pub signature: BlobIndex,
 }
@@ -312,7 +312,7 @@ pub struct MemberRefRow {
 impl TableRow for MemberRefRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<MemberRefRow, std::io::Error> {
         Ok(MemberRefRow {
-            class: buffer.read_u16()?,
+            class: CodedIndex::read(buffer, CodedIndexTag::MemberRefParent)?,
             name: StringIndex::read(buffer)?,
             signature: BlobIndex::read(buffer)?,
         })
@@ -340,7 +340,7 @@ pub struct MethodDefRow {
     pub flags: u16,
     pub name: StringIndex,
     pub signature: BlobIndex,
-    pub param_list: u16,
+    pub param_list: CodedIndex,
 }
 
 impl TableRow for MethodDefRow {
@@ -351,7 +351,10 @@ impl TableRow for MethodDefRow {
             flags: buffer.read_u16()?,
             name: StringIndex::read(buffer)?,
             signature: BlobIndex::read(buffer)?,
-            param_list: buffer.read_u16()?,
+            param_list: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Param,
+            },
         })
     }
 }
@@ -443,9 +446,9 @@ pub struct TypeDefRow {
     pub flags: u32,
     pub type_name: StringIndex,
     pub type_namespace: StringIndex,
-    pub extends: u16,
-    pub field_list: u16,
-    pub method_list: u16,
+    pub extends: CodedIndex,
+    pub field_list: CodedIndex,
+    pub method_list: CodedIndex,
 }
 
 impl TableRow for TypeDefRow {
@@ -454,9 +457,15 @@ impl TableRow for TypeDefRow {
             flags: buffer.read_u32()?,
             type_name: StringIndex::read(buffer)?,
             type_namespace: StringIndex::read(buffer)?,
-            extends: buffer.read_u16()?,
-            field_list: buffer.read_u16()?,
-            method_list: buffer.read_u16()?,
+            extends: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+            field_list: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Field,
+            },
+            method_list: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::MethodDef,
+            },
         })
     }
 }
@@ -470,7 +479,7 @@ impl TableRow for TypeDefRow {
 /// * *TypeNamespace* (an index into the String heap)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TypeRefRow {
-    pub resolution_scope: u16,
+    pub resolution_scope: CodedIndex,
     pub type_name: StringIndex,
     pub type_namespace: StringIndex,
 }
@@ -478,7 +487,7 @@ pub struct TypeRefRow {
 impl TableRow for TypeRefRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<TypeRefRow, std::io::Error> {
         Ok(TypeRefRow {
-            resolution_scope: buffer.read_u16()?,
+            resolution_scope: CodedIndex::read(buffer, CodedIndexTag::ResolutionScope)?,
             type_name: StringIndex::read(buffer)?,
             type_namespace: StringIndex::read(buffer)?,
         })
