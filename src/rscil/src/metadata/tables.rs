@@ -4,54 +4,110 @@ use crate::BufReaderExtension;
 
 use super::{BlobIndex, GuidIndex, StringIndex, TableKind};
 
-pub enum Table {
-    /// II.22.2 Assembly : 0x20
-    /// [...]
-    ///  
-    /// 1. The Assembly table shall contain zero or one row [ERROR]
-    Assembly(Option<AssemblyRow>),
-    AssemblyRef(Vec<AssemblyRefRow>),
-    Constant(Vec<ConstantRow>),
-    CustomAttribute(Vec<CustomAttributeRow>),
-    Field(Vec<FieldRow>),
-    MemberRef(Vec<MemberRefRow>),
-    MethodDef(Vec<MethodDefRow>),
-    /// II.22.30 Module : 0x00
-    /// [...]
-    /// 
-    /// 1. The Module table shall contain one and only one row [ERROR] 
-    Module(ModuleRow),
-    Param(Vec<ParamRow>),
-    TypeDef(Vec<TypeDefRow>),
-    TypeRef(Vec<TypeRefRow>),
+/// II.22.2 Assembly : 0x20
+/// [...]
+///  
+/// 1. The Assembly table shall contain zero or one row [ERROR]
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AssemblyTable { pub row: Option<AssemblyRow> }
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct AssemblyRefTable(Vec<AssemblyRefRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ConstantTable(Vec<ConstantRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct CustomAttributeTable(Vec<CustomAttributeRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct FieldTable(Vec<FieldRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MemberRefTable(Vec<MemberRefRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct MethodDefTable(Vec<MethodDefRow>);
+
+/// II.22.30 Module : 0x00
+/// [...]
+/// 
+/// 1. The Module table shall contain one and only one row [ERROR] 
+pub struct ModuleTable(pub ModuleRow);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct ParamTable(Vec<ParamRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeDefTable(Vec<TypeDefRow>);
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct TypeRefTable(Vec<TypeRefRow>);
+
+fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Vec<T>, std::io::Error> {
+    let mut rows = Vec::new();
+    for _ in 0..row_count {
+        rows.push(T::read_from(buffer)?);
+    }
+    Ok(rows)
 }
 
-impl Table {
-    pub fn read_from(buffer: &mut BufReader<File>, kind: TableKind, row_count: u32) -> Result<Table, std::io::Error> {
-        match kind {
-            TableKind::Assembly => Ok(Table::Assembly(if row_count <= 0 { None } else { Some(Self::read_rows::<AssemblyRow>(buffer, row_count)?[0]) })),
-            TableKind::AssemblyRef => Ok(Table::AssemblyRef(Self::read_rows::<AssemblyRefRow>(buffer, row_count)?)),
-            TableKind::Constant => Ok(Table::Constant(Self::read_rows::<ConstantRow>(buffer, row_count)?)),
-            TableKind::CustomAttribute => Ok(Table::CustomAttribute(Self::read_rows::<CustomAttributeRow>(buffer, row_count)?)),
-            TableKind::Field => Ok(Table::Field(Self::read_rows::<FieldRow>(buffer, row_count)?)),
-            TableKind::MemberRef => Ok(Table::MemberRef(Self::read_rows::<MemberRefRow>(buffer, row_count)?)),
-            TableKind::MethodDef => Ok(Table::MethodDef(Self::read_rows::<MethodDefRow>(buffer, row_count)?)),
-            TableKind::Module => Ok(Table::Module(ModuleRow::read_from(buffer)?)),
-            TableKind::Param => Ok(Table::Param(Self::read_rows::<ParamRow>(buffer, row_count)?)),
-            TableKind::TypeDef => Ok(Table::TypeDef(Self::read_rows::<TypeDefRow>(buffer, row_count)?)),
-            TableKind::TypeRef => Ok(Table::TypeRef(Self::read_rows::<TypeRefRow>(buffer, row_count)?)),
-            _ => panic!("Unknown table kind: {:?}", kind),
+macro_rules! table_impl {
+    ($class:ident, $read:expr) => {
+        impl $class {
+            pub fn read_from(buffer: &mut BufReader<File>, row_count: u32) -> Result<Self, std::io::Error> {
+                $read(buffer, row_count)
+            }
         }
-    }
-
-    fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Vec<T>, std::io::Error> {
-        let mut rows = Vec::new();
-        for _ in 0..row_count {
-            rows.push(T::read_from(buffer)?);
-        }
-        Ok(rows)
-    }
+    };
 }
+
+
+table_impl!(AssemblyTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(AssemblyTable {
+        row: if row_count <= 0 {None} else { Some(AssemblyRow::read_from(buffer)?) }
+    })
+});
+
+table_impl!(AssemblyRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(AssemblyRefTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(ConstantTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(ConstantTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(CustomAttributeTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(CustomAttributeTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(FieldTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(FieldTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(MemberRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(MemberRefTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(MethodDefTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(MethodDefTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(ModuleTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(ModuleTable(ModuleRow::read_from(buffer)?))
+});
+
+table_impl!(ParamTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(ParamTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(TypeDefTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(TypeDefTable(read_rows(buffer, row_count)?))
+});
+
+table_impl!(TypeRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
+    Ok(TypeRefTable(read_rows(buffer, row_count)?))
+});
 
 pub trait TableRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<Self, std::io::Error> where Self: Sized;
@@ -173,6 +229,7 @@ impl TableRow for ConstantRow {
 /// * *Parent* (an index into a metadata table that has an associated *HasCustomAttribute* (§II.24.2.6) coded index)
 /// * *Type* (an index into the *MethodDef* or *MemberRef* table; more precisely, a *CustomAttributeType* (§II.24.2.6) coded index). 
 /// * *Value* (an index into the Blob heap). 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct CustomAttributeRow {
     pub parent: u16,
     pub type_: u16,

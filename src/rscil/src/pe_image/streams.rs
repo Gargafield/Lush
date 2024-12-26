@@ -1,6 +1,6 @@
-use std::{collections::HashMap, fs::File, io::{BufRead, BufReader, Read, Seek}};
+use std::{any::Any, collections::HashMap, fs::File, io::{BufRead, BufReader, Read, Seek}};
 
-use crate::{Table, TableKind};
+use crate::*;
 
 use super::{bufreader_extension::BufReaderExtension, cli_header, metadata_header::StreamHeader, CliHeader};
 
@@ -222,7 +222,7 @@ pub struct MetadataStream {
     pub valid: u64,
     pub sorted: u64,
     pub rows: Vec<u32>,
-    pub tables: HashMap<TableKind, Table>,
+    pub tables: HashMap<TableKind, Box<dyn Any>>,
 }
 
 impl MetadataStream {
@@ -245,12 +245,24 @@ impl MetadataStream {
             rows.push(buffer.read_u32()?);
         }
 
-        let mut tables = HashMap::new();
-        
+        let mut tables = HashMap::<TableKind, Box<dyn Any>>::new();
 
         let table_kinds = TableKind::from_bitmask(valid);
         for (i, kind) in table_kinds.iter().enumerate() {
-            tables.insert(*kind, Table::read_from(buffer, *kind, rows[i])?);
+            tables.insert(*kind, match kind {
+                TableKind::Assembly => Box::new(AssemblyTable::read_from(buffer, rows[i])?),
+                TableKind::AssemblyRef => Box::new(AssemblyRefTable::read_from(buffer, rows[i])?),
+                TableKind::Constant => Box::new(ConstantTable::read_from(buffer, rows[i])?),
+                TableKind::CustomAttribute => Box::new(CustomAttributeTable::read_from(buffer, rows[i])?),
+                TableKind::Field => Box::new(FieldTable::read_from(buffer, rows[i])?),
+                TableKind::MemberRef => Box::new(MemberRefTable::read_from(buffer, rows[i])?),
+                TableKind::MethodDef => Box::new(MethodDefTable::read_from(buffer, rows[i])?),
+                TableKind::Module => Box::new(ModuleTable::read_from(buffer, rows[i])?),
+                TableKind::Param => Box::new(ParamTable::read_from(buffer, rows[i])?),
+                TableKind::TypeDef => Box::new(TypeDefTable::read_from(buffer, rows[i])?),
+                TableKind::TypeRef => Box::new(TypeRefTable::read_from(buffer, rows[i])?),
+                _ => panic!("Unknown table kind: {:?}", kind),
+            });
         }
 
         Ok(MetadataStream {
@@ -262,6 +274,10 @@ impl MetadataStream {
             rows,
             tables,
         })
+    }
+
+    pub fn get_table<T: Any + 'static>(&self, kind: TableKind) -> Option<&T> {
+        self.tables.get(&kind).and_then(|table| table.downcast_ref::<T>())
     }
 }
 
