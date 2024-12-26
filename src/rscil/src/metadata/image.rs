@@ -14,7 +14,7 @@ pub struct PeImage {
 
 impl PeImage {
     pub fn get_string(&self, index: StringIndex) -> &String {
-        self.streams.strings.get(index.0 as u32).unwrap()
+        self.streams.strings.get(index.0).unwrap()
     }
 
     pub fn get_assembly(&self) -> Option<AssemblyRow> {
