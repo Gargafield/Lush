@@ -14,7 +14,12 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut image = pe_image::PeImage::open("tests/HelloWorld.exe").unwrap();
-        image.read().unwrap();
+        let mut image = PeParser::open("tests/HelloWorld.exe")
+            .and_then(|mut parser| parser.read())
+            .unwrap();
+
+        let assembly = image.get_assembly().unwrap();
+        
+        dbg!(image.get_string(assembly.name));
     }
 }
