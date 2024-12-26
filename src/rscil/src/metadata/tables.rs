@@ -1,4 +1,4 @@
-use std::{fs::File, io::BufReader};
+use std::{fs::File, io::{BufReader, Read}};
 
 use metadata::bufreader_extension::BufReaderExtension;
 
@@ -128,7 +128,7 @@ pub struct AssemblyRow {
     pub minor_version: u16,
     pub build_number: u16,
     pub revision_number: u16,
-    pub flags: u32,
+    pub flags: AssemblyFlags,
     pub public_key: BlobIndex,
     pub name: StringIndex,
     pub culture: StringIndex,
@@ -142,7 +142,7 @@ impl TableRow for AssemblyRow {
             minor_version: buffer.read_u16()?,
             build_number: buffer.read_u16()?,
             revision_number: buffer.read_u16()?,
-            flags: buffer.read_u32()?,
+            flags: AssemblyFlags::from(buffer.read_u32()? as u16),
             public_key: BlobIndex::read(buffer)?,
             name: StringIndex::read(buffer)?,
             culture: StringIndex::read(buffer)?,
@@ -167,7 +167,7 @@ pub struct AssemblyRefRow {
     pub minor_version: u16,
     pub build_number: u16,
     pub revision_number: u16,
-    pub flags: u32,
+    pub flags: AssemblyFlags,
     pub public_key_or_token: BlobIndex,
     pub name: StringIndex,
     pub culture: StringIndex,
@@ -181,7 +181,7 @@ impl TableRow for AssemblyRefRow {
             minor_version: buffer.read_u16()?,
             build_number: buffer.read_u16()?,
             revision_number: buffer.read_u16()?,
-            flags: buffer.read_u32()?,
+            flags: AssemblyFlags::from(buffer.read_u32()? as u16),
             public_key_or_token: BlobIndex::read(buffer)?,
             name: StringIndex::read(buffer)?,
             culture: StringIndex::read(buffer)?,
@@ -208,7 +208,7 @@ impl TableRow for AssemblyRefRow {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ConstantRow {
     pub type_: u16,
-    pub parent: u16,
+    pub parent: CodedIndex,
     pub value: BlobIndex,
 }
 
@@ -216,7 +216,7 @@ impl TableRow for ConstantRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<ConstantRow, std::io::Error> {
         Ok(ConstantRow {
             type_: buffer.read_u16()?,
-            parent: buffer.read_u16()?,
+            parent: CodedIndex::read(buffer, CodedIndexTag::HasConstant)?,
             value: BlobIndex::read(buffer)?,
         })
     }
@@ -265,7 +265,7 @@ impl TableRow for CustomAttributeRow {
 /// shown in the following illustration.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct FieldRow {
-    pub flags: u16,
+    pub flags: FieldAttributes,
     pub name: StringIndex,
     pub signature: BlobIndex,
 }
@@ -273,7 +273,7 @@ pub struct FieldRow {
 impl TableRow for FieldRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<FieldRow, std::io::Error> {
         Ok(FieldRow {
-            flags: buffer.read_u16()?,
+            flags: FieldAttributes::from(buffer.read_u16()?),
             name: StringIndex::read(buffer)?,
             signature: BlobIndex::read(buffer)?,
         })
@@ -336,8 +336,8 @@ impl TableRow for MemberRefRow {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MethodDefRow {
     pub rva: u32,
-    pub impl_flags: u16,
-    pub flags: u16,
+    pub impl_flags: MethodImplAttributes,
+    pub flags: MethodAttributes,
     pub name: StringIndex,
     pub signature: BlobIndex,
     pub param_list: CodedIndex,
@@ -347,8 +347,8 @@ impl TableRow for MethodDefRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<MethodDefRow, std::io::Error> {
         Ok(MethodDefRow {
             rva: buffer.read_u32()?,
-            impl_flags: buffer.read_u16()?,
-            flags: buffer.read_u16()?,
+            impl_flags: MethodImplAttributes::from(buffer.read_u16()?),
+            flags: MethodAttributes::from(buffer.read_u16()?),
             name: StringIndex::read(buffer)?,
             signature: BlobIndex::read(buffer)?,
             param_list: CodedIndex {
@@ -405,7 +405,7 @@ impl TableRow for ModuleRow {
 /// Conceptually, every row in the Param table is owned by one, and only one, row in the *MethodDef* table.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct ParamRow {
-    pub flags: u16,
+    pub flags: ParamAttributes,
     pub sequence: u16,
     pub name: StringIndex,
 }
@@ -413,7 +413,7 @@ pub struct ParamRow {
 impl TableRow for ParamRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<ParamRow, std::io::Error> {
         Ok(ParamRow {
-            flags: buffer.read_u16()?,
+            flags: ParamAttributes::from(buffer.read_u16()?),
             sequence: buffer.read_u16()?,
             name: StringIndex::read(buffer)?,
         })
@@ -443,7 +443,7 @@ impl TableRow for ParamRow {
 /// and variables defined at module scope.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TypeDefRow {
-    pub flags: u32,
+    pub flags: TypeAttributes,
     pub type_name: StringIndex,
     pub type_namespace: StringIndex,
     pub extends: CodedIndex,
@@ -454,7 +454,7 @@ pub struct TypeDefRow {
 impl TableRow for TypeDefRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<TypeDefRow, std::io::Error> {
         Ok(TypeDefRow {
-            flags: buffer.read_u32()?,
+            flags: TypeAttributes::from(buffer.read_u32()?),
             type_name: StringIndex::read(buffer)?,
             type_namespace: StringIndex::read(buffer)?,
             extends: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
