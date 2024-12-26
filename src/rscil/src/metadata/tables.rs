@@ -1,4 +1,4 @@
-use std::{fs::File, io::{BufReader, Read}};
+use std::{fs::File, io::BufReader};
 
 use metadata::bufreader_extension::BufReaderExtension;
 
