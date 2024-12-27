@@ -1,4 +1,4 @@
-use crate::{AssemblyRow, AssemblyTable, ModuleRow, ModuleTable, StringIndex};
+use crate::{cast_table, AssemblyRow, ModuleRow, StringIndex};
 
 use super::*;
 
@@ -18,10 +18,10 @@ impl PeImage {
     }
 
     pub fn get_assembly(&self) -> Option<AssemblyRow> {
-        self.streams.metadata.get_table::<AssemblyTable>(crate::TableKind::Assembly).unwrap().row
+        cast_table!(Assembly, self.streams.metadata.get_table(TableKind::Assembly))
     }
 
     pub fn get_module(&self) -> ModuleRow {
-        self.streams.metadata.get_table::<ModuleTable>(crate::TableKind::Module).unwrap().0
+        cast_table!(Module, self.streams.metadata.get_table(TableKind::Module))
     }
 }

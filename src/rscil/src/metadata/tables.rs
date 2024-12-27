@@ -4,45 +4,106 @@ use metadata::bufreader_extension::BufReaderExtension;
 
 use crate::*;
 
-/// II.22.2 Assembly : 0x20
-/// [...]
-///  
-/// 1. The Assembly table shall contain zero or one row [ERROR]
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct AssemblyTable { pub row: Option<AssemblyRow> }
+#[macro_export]
+macro_rules! cast_table {
+    ($table:ident, $expr:expr) => {
+        match $expr {
+            Some(Table::$table(x)) => *x,
+            _ => panic!("Failed to cast table to {}", stringify!($table))
+        }
+    };
+}
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct AssemblyRefTable(Vec<AssemblyRefRow>);
+pub enum Table {
+    /// # II.22.2 Assembly : 0x20
+    /// [...]
+    ///  
+    /// 1. The Assembly table shall contain zero or one row [ERROR]
+    Assembly(Option<AssemblyRow>),
+    AssemblyRef(Vec<AssemblyRefRow>),
+    ClassLayout(Vec<ClassLayoutRow>),
+    Constant(Vec<ConstantRow>),
+    CustomAttribute(Vec<CustomAttributeRow>),
+    DeclSecurity(Vec<DeclSecurityRow>),
+    EventMap(Vec<EventMapRow>),
+    Event(Vec<EventRow>),
+    ExportedType(Vec<ExportedTypeRow>),
+    Field(Vec<FieldRow>),
+    FieldLayout(Vec<FieldLayoutRow>),
+    FieldMarshal(Vec<FieldMarshalRow>),
+    FieldRVA(Vec<FieldRVARow>),
+    File(Vec<FileRow>),
+    GenericParam(Vec<GenericParamRow>),
+    GenericParamConstraint(Vec<GenericParamConstraintRow>),
+    ImplMap(Vec<ImplMapRow>),
+    InterfaceImpl(Vec<InterfaceImplRow>),
+    ManifestResource(Vec<ManifestResourceRow>),
+    MemberRef(Vec<MemberRefRow>),
+    MethodDef(Vec<MethodDefRow>),
+    MethodImpl(Vec<MethodImplRow>),
+    MethodSemantics(Vec<MethodSemanticsRow>),
+    MethodSpec(Vec<MethodSpecRow>),
+    /// II.22.30 Module : 0x00
+    /// [...]
+    /// 
+    /// 1. The Module table shall contain one and only one row [ERROR] 
+    Module(ModuleRow),
+    ModuleRef(Vec<ModuleRefRow>),
+    NestedClass(Vec<NestedClassRow>),
+    Param(Vec<ParamRow>),
+    Property(Vec<PropertyRow>),
+    PropertyMap(Vec<PropertyMapRow>),
+    StandAloneSig(Vec<StandAloneSigRow>),
+    TypeDef(Vec<TypeDefRow>),
+    TypeRef(Vec<TypeRefRow>),
+    TypeSpec(Vec<TypeSpecRow>),
+}
 
-#[derive(Debug, Clone, PartialEq)]
-pub struct ConstantTable(Vec<ConstantRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct CustomAttributeTable(Vec<CustomAttributeRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct FieldTable(Vec<FieldRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MemberRefTable(Vec<MemberRefRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct MethodDefTable(Vec<MethodDefRow>);
-
-/// II.22.30 Module : 0x00
-/// [...]
-/// 
-/// 1. The Module table shall contain one and only one row [ERROR] 
-pub struct ModuleTable(pub ModuleRow);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct ParamTable(Vec<ParamRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TypeDefTable(Vec<TypeDefRow>);
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct TypeRefTable(Vec<TypeRefRow>);
+impl Table {
+    pub fn read(buffer: &mut BufReader<File>, kind: TableKind, row_count: u32) -> Result<Table, std::io::Error> {
+        match kind {
+            TableKind::Assembly => Ok(Table::Assembly(read_single_row(buffer, row_count)?)),
+            TableKind::AssemblyOS => unimplemented!(),
+            TableKind::AssemblyProcessor => unimplemented!(),
+            TableKind::AssemblyRef => Ok(Table::AssemblyRef(read_rows(buffer, row_count)?)),
+            TableKind::AssemblyRefOS => unimplemented!(),
+            TableKind::AssemblyRefProcessor => unimplemented!(),
+            TableKind::ClassLayout => Ok(Table::ClassLayout(read_rows(buffer, row_count)?)),
+            TableKind::Constant => Ok(Table::Constant(read_rows(buffer, row_count)?)),
+            TableKind::CustomAttribute => Ok(Table::CustomAttribute(read_rows(buffer, row_count)?)),
+            TableKind::DeclSecurity => Ok(Table::DeclSecurity(read_rows(buffer, row_count)?)),
+            TableKind::EventMap => Ok(Table::EventMap(read_rows(buffer, row_count)?)),
+            TableKind::Event => Ok(Table::Event(read_rows(buffer, row_count)?)),
+            TableKind::ExportedType => Ok(Table::ExportedType(read_rows(buffer, row_count)?)),
+            TableKind::Field => Ok(Table::Field(read_rows(buffer, row_count)?)),
+            TableKind::FieldLayout => Ok(Table::FieldLayout(read_rows(buffer, row_count)?)),
+            TableKind::FieldMarshal => Ok(Table::FieldMarshal(read_rows(buffer, row_count)?)),
+            TableKind::FieldRVA => Ok(Table::FieldRVA(read_rows(buffer, row_count)?)),
+            TableKind::File => Ok(Table::File(read_rows(buffer, row_count)?)),
+            TableKind::GenericParam => Ok(Table::GenericParam(read_rows(buffer, row_count)?)),
+            TableKind::GenericParamConstraint => Ok(Table::GenericParamConstraint(read_rows(buffer, row_count)?)),
+            TableKind::ImplMap => Ok(Table::ImplMap(read_rows(buffer, row_count)?)),
+            TableKind::InterfaceImpl => Ok(Table::InterfaceImpl(read_rows(buffer, row_count)?)),
+            TableKind::ManifestResource => Ok(Table::ManifestResource(read_rows(buffer, row_count)?)),
+            TableKind::MemberRef => Ok(Table::MemberRef(read_rows(buffer, row_count)?)),
+            TableKind::MethodDef => Ok(Table::MethodDef(read_rows(buffer, row_count)?)),
+            TableKind::MethodImpl => Ok(Table::MethodImpl(read_rows(buffer, row_count)?)),
+            TableKind::MethodSemantics => Ok(Table::MethodSemantics(read_rows(buffer, row_count)?)),
+            TableKind::MethodSpec => Ok(Table::MethodSpec(read_rows(buffer, row_count)?)),
+            TableKind::Module => Ok(Table::Module(ModuleRow::read_from(buffer)?)),
+            TableKind::ModuleRef => Ok(Table::ModuleRef(read_rows(buffer, row_count)?)),
+            TableKind::NestedClass => Ok(Table::NestedClass(read_rows(buffer, row_count)?)),
+            TableKind::Param => Ok(Table::Param(read_rows(buffer, row_count)?)),
+            TableKind::Property => Ok(Table::Property(read_rows(buffer, row_count)?)),
+            TableKind::PropertyMap => Ok(Table::PropertyMap(read_rows(buffer, row_count)?)),
+            TableKind::StandAloneSig => Ok(Table::StandAloneSig(read_rows(buffer, row_count)?)),
+            TableKind::TypeDef => Ok(Table::TypeDef(read_rows(buffer, row_count)?)),
+            TableKind::TypeRef => Ok(Table::TypeRef(read_rows(buffer, row_count)?)),
+            TableKind::TypeSpec => Ok(Table::TypeSpec(read_rows(buffer, row_count)?)),
+        }
+    }
+}
 
 fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Vec<T>, std::io::Error> {
     let mut rows = Vec::new();
@@ -52,62 +113,13 @@ fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Resul
     Ok(rows)
 }
 
-macro_rules! table_impl {
-    ($class:ident, $read:expr) => {
-        impl $class {
-            pub fn read_from(buffer: &mut BufReader<File>, row_count: u32) -> Result<Self, std::io::Error> {
-                $read(buffer, row_count)
-            }
-        }
-    };
+fn read_single_row<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Option<T>, std::io::Error> {
+    if row_count <= 0 {
+        Ok(None)
+    } else {
+        Ok(Some(T::read_from(buffer)?))
+    }
 }
-
-
-table_impl!(AssemblyTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(AssemblyTable {
-        row: if row_count <= 0 {None} else { Some(AssemblyRow::read_from(buffer)?) }
-    })
-});
-
-table_impl!(AssemblyRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(AssemblyRefTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(ConstantTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(ConstantTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(CustomAttributeTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(CustomAttributeTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(FieldTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(FieldTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(MemberRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(MemberRefTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(MethodDefTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(MethodDefTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(ModuleTable, |buffer: &mut BufReader<File>, _row_count: u32| {
-    Ok(ModuleTable(ModuleRow::read_from(buffer)?))
-});
-
-table_impl!(ParamTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(ParamTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(TypeDefTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(TypeDefTable(read_rows(buffer, row_count)?))
-});
-
-table_impl!(TypeRefTable, |buffer: &mut BufReader<File>, row_count: u32| {
-    Ok(TypeRefTable(read_rows(buffer, row_count)?))
-});
 
 pub trait TableRow {
     fn read_from(buffer: &mut BufReader<File>) -> Result<Self, std::io::Error> where Self: Sized;
@@ -150,10 +162,8 @@ impl TableRow for AssemblyRow {
     }
 }
 
-// TODO: AssemblyOS
-// TODO: AssemblyProcessor
-
 /// # II.22.8 AssemblyRef : 0x23
+/// 
 /// The *AssemblyRef* table has the following columns: 
 /// * *MajorVersion*, *MinorVersion*, *BuildNumber*, *RevisionNumber* (each being 2-byte constants)
 /// * *Flags* (a 4-byte bitmask of type AssemblyFlags, §II.23.1.2)
@@ -190,9 +200,33 @@ impl TableRow for AssemblyRefRow {
     }
 }
 
-// TODO: AssemblyRefOS
-// TODO: AssemblyRefProcessor
-// TODO: ClassLayout
+/// # II.22.8 ClassLayout : 0x0F
+/// 
+/// [...]
+/// 
+/// The ClassLayout table has the following columns: 
+/// * *PackingSize* (a 2-byte constant)
+/// * *ClassSize* (a 4-byte constant)
+/// * *Parent* (an index into the TypeDef table)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ClassLayoutRow {
+    pub packing_size: u16,
+    pub class_size: u32,
+    pub parent: CodedIndex,
+}
+
+impl TableRow for ClassLayoutRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<ClassLayoutRow, std::io::Error> {
+        Ok(ClassLayoutRow {
+            packing_size: buffer.read_u16()?,
+            class_size: buffer.read_u32()?,
+            parent: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            }
+        })
+    }
+}
 
 /// # II.22.9 Constant : 0x0B
 /// 
@@ -246,10 +280,123 @@ impl TableRow for CustomAttributeRow {
     }
 }
 
-// TODO: DeclSecurity
-// TODO: EventMap
-// TODO: Event
-// TODO: ExportedType
+/// # II.22.11 DeclSecurity : 0x0E
+/// 
+/// [...]
+/// 
+/// The *DeclSecurity* table has the following columns: 
+/// * *Action* (a 2-byte value)
+/// * *Parent* (an index into the *TypeDef*, *MethodDef*, or *Assembly* table; more precisely, a HasDeclSecurity  (§II.24.2.6) coded index)
+/// * *PermissionSet* (an index into the Blob heap)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct DeclSecurityRow {
+    pub action: u16,
+    pub parent: CodedIndex,
+    pub permission_set: BlobIndex,
+}
+
+impl TableRow for DeclSecurityRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<DeclSecurityRow, std::io::Error> {
+        Ok(DeclSecurityRow {
+            action: buffer.read_u16()?,
+            parent: CodedIndex::read(buffer, CodedIndexTag::HasDeclSecurity)?,
+            permission_set: BlobIndex::read(buffer)?,
+        })
+    }
+}
+
+/// # II.22.12 EventMap : 0x12
+/// 
+/// The *EventMap* table has the following columns:
+/// * *Parent* (an index into the *TypeDef* table)
+/// * *EventList* (an index into the *Event* table). It marks the first of a contiguous run of Events owned by this Type.
+///   The run continues to the smaller of:
+///     * the last row of the *Event* table
+///     * the next run of Events, found by inspecting the *EventList* of the next row in the *EventMap* table
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EventMapRow {
+    pub parent: CodedIndex,
+    pub event_list: CodedIndex,
+}
+
+impl TableRow for EventMapRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<EventMapRow, std::io::Error> {
+        Ok(EventMapRow {
+            parent: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+            event_list: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Event,
+            },
+        })
+    }
+}
+
+/// # II.22.13 Event : 0x14 
+/// 
+/// [...]
+/// 
+/// The Event table has the following columns:
+/// * *EventFlags* (a 2-byte bitmask of type *EventAttributes*, §II.23.1.4)
+/// * *Name* (an index into the String heap)
+/// * *EventType* (an index into a *TypeDef*, a *TypeRef*, or *TypeSpec* table; more precisely, a *TypeDefOrRef*  (§II.24.2.6) coded index)
+///   (This corresponds to the Type of the Event; it is not the Type that owns this event.)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct EventRow {
+    pub event_flags: EventAttributes,
+    pub name: StringIndex,
+    pub event_type: CodedIndex,
+}
+
+impl TableRow for EventRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<EventRow, std::io::Error> {
+        Ok(EventRow {
+            event_flags: EventAttributes::from(buffer.read_u16()?),
+            name: StringIndex::read(buffer)?,
+            event_type: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+        })
+    }
+}
+
+/// # II.22.14 ExportedType : 0x27 
+/// 
+/// [...]
+/// 
+/// The *ExportedType* table has the following columns: 
+/// * *Flags* (a 4-byte bitmask of type *TypeAttributes*, §II.23.1.15)
+/// * *TypeDefId* (a 4-byte index into a TypeDef table of another module in this Assembly).  
+///    This column is used as a hint only.  If the entry in the target TypeDef table matches 
+///    the TypeName and TypeNamespace entries in this table, resolution has succeeded.  
+///    But if there is a mismatch, the CLI shall fall back to a search of the target TypeDef 
+///    table. Ignored and should be zero if Flags has IsTypeForwarder set.
+/// * *TypeName* (an index into the String heap)
+/// * *TypeNamespace* (an index into the String heap)
+/// * *Implementation* This is an index (more precisely, an Implementation (§II.24.2.6) coded index) into either of the following tables:
+///      * *File* table, where that entry says which module in the current assembly holds the *TypeDef*
+///      * *ExportedType*  table, where that entry is the enclosing Type of the current nested Type
+///      * *AssemblyRef* table, where that entry says in which assembly the type may now be found (Flags must have the IsTypeForwarder flag set).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ExportedTypeRow {
+    pub flags: TypeAttributes,
+    pub type_def_id: u32,
+    pub type_name: StringIndex,
+    pub type_namespace: StringIndex,
+    pub implementation: CodedIndex,
+}
+
+impl TableRow for ExportedTypeRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<ExportedTypeRow, std::io::Error> {
+        Ok(ExportedTypeRow {
+            flags: TypeAttributes::from(buffer.read_u32()?),
+            type_def_id: buffer.read_u32()?,
+            type_name: StringIndex::read(buffer)?,
+            type_namespace: StringIndex::read(buffer)?,
+            implementation: CodedIndex::read(buffer, CodedIndexTag::Implementation)?,
+        })
+    }
+}
 
 /// # II.22.15 Field : 0x04
 /// 
@@ -280,15 +427,231 @@ impl TableRow for FieldRow {
     }
 }
 
-// TODO: FieldLayout
-// TODO: FieldMarshal 
-// TODO: FieldRVA
-// TODO: File
-// TODO: GenericParam
-// TODO: GenericParamConstraint
-// TODO: ImplMap
-// TODO: InterfaceImpl
-// TODO: ManifestResource
+/// # II.22.16 FieldLayout : 0x10
+/// 
+/// The *FieldLayout* table has the following columns:
+/// * *Offset* (a 4-byte constant)
+/// * *Field* (an index into the *Field* table)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FieldLayoutRow {
+    pub offset: u32,
+    pub field: CodedIndex,
+}
+
+impl TableRow for FieldLayoutRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldLayoutRow, std::io::Error> {
+        Ok(FieldLayoutRow {
+            offset: buffer.read_u32()?,
+            field: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Field,
+            }
+        })
+    }
+}
+
+/// # II.22.17 FieldMarshal : 0x0D
+/// 
+/// [...]
+/// 
+/// The *FieldMarshal* table has the following columns:
+/// * *Parent* (an index into *Field* or *Param* table; more precisely, a *HasFieldMarshal* (§II.24.2.6) coded index)
+/// * *NativeType* (an index into the Blob heap)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FieldMarshalRow {
+    pub parent: CodedIndex,
+    pub native_type: BlobIndex,
+}
+
+impl TableRow for FieldMarshalRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldMarshalRow, std::io::Error> {
+        Ok(FieldMarshalRow {
+            parent: CodedIndex::read(buffer, CodedIndexTag::HasFieldMarshal)?,
+            native_type: BlobIndex::read(buffer)?,
+        })
+    }
+}
+
+/// # II.22.18 FieldRVA : 0x1D
+/// 
+/// The *FieldRVA* table has the following columns:
+/// * *RVA* (a 4-byte constant)
+/// * *Field* (an index into the *Field* table)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FieldRVARow {
+    pub rva: u32,
+    pub field: CodedIndex,
+}
+
+impl TableRow for FieldRVARow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldRVARow, std::io::Error> {
+        Ok(FieldRVARow {
+            rva: buffer.read_u32()?,
+            field: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Field,
+            }
+        })
+    }
+    
+}
+
+/// # II.22.19 File : 0x26
+/// 
+/// The *File* table has the following columns:
+/// * *Flags* (a 4-byte bitmask of type *FileAttributes*, §II.23.1.6)
+/// * *Name* (an index into the String heap)
+/// * *HashValue* (an index into the Blob heap)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct FileRow {
+    pub flags: FileAttributes,
+    pub name: StringIndex,
+    pub hash_value: BlobIndex,
+}
+
+impl TableRow for FileRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<FileRow, std::io::Error> {
+        Ok(FileRow {
+            flags: FileAttributes::from(buffer.read_u32()?),
+            name: StringIndex::read(buffer)?,
+            hash_value: BlobIndex::read(buffer)?,
+        })
+    }
+    
+}
+
+/// # II.22.20 GenericParam : 0x2A 
+/// 
+/// The *GenericParam* table has the following columns:
+/// * *Number* (the 2-byte index of the generic parameter, numbered left-to-right, from zero)
+/// * *Flags* (a 2-byte bitmask of type *GenericParamAttributes*, §II.23.1.7)
+/// * *Owner* (an index into the *TypeDef* or *MethodDef* table, specifying the Type or Method to
+///   which this generic parameter applies; more precisely, a *TypeOrMethodDef* (§II.24.2.6) coded index)
+/// * *Name* (a non-null index into the String heap, giving the name for the generic parameter.
+///   This is purely descriptive and is used only by source language compilers and by Reflection)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GenericParamRow {
+    pub number: u16,
+    pub flags: GenericParamAttributes,
+    pub owner: CodedIndex,
+    pub name: StringIndex,
+}
+
+impl TableRow for GenericParamRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<GenericParamRow, std::io::Error> {
+        Ok(GenericParamRow {
+            number: buffer.read_u16()?,
+            flags: GenericParamAttributes::from(buffer.read_u16()?),
+            owner: CodedIndex::read(buffer, CodedIndexTag::TypeOrMethodDef)?,
+            name: StringIndex::read(buffer)?,
+        })
+    }
+}
+
+/// # II.22.21 GenericParamConstraint : 0x2C
+/// 
+/// The *GenericParamConstraint* table has the following columns: 
+/// * *Owner* (an index into the *GenericParam* table, specifying to which generic parameter this row refers)
+/// * *Constraint* (an index into the *TypeDef*, *TypeRef*, or *TypeSpec* tables, specifying from which class this generic parameter is constrained to derive;
+///   or which interface this generic parameter is constrained to implement; more precisely, a *TypeDefOrRef* (§II.24.2.6) coded index)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct GenericParamConstraintRow {
+    pub owner: CodedIndex,
+    pub constraint: CodedIndex,
+}
+
+impl TableRow for GenericParamConstraintRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<GenericParamConstraintRow, std::io::Error> {
+        Ok(GenericParamConstraintRow {
+            owner: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::GenericParam,
+            },
+            constraint: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+        })
+    }
+}
+
+/// # II.22.22 ImplMap : 0x1C
+///
+/// [...]
+/// 
+/// The *ImplMap* table has the following columns:
+/// * *MappingFlags* (a 2-byte bitmask of type *PInvokeAttributes*, §23.1.8)
+/// * *MemberForwarded* (an index into the *Field* or *MethodDef* table; more precisely, a *MemberForwarded* (§II.24.2.6) coded index).
+///   However, it only ever indexes the *MethodDef* table, since *Field* export is not supported. 
+/// * *ImportName* (an index into the String heap)
+/// * *ImportScope* (an index into the *ModuleRef* table)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ImplMapRow {
+    pub mapping_flags: PInvokeAttributes,
+    pub member_forwarded: CodedIndex,
+    pub import_name: StringIndex,
+    pub import_scope: CodedIndex,
+}
+
+impl TableRow for ImplMapRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<ImplMapRow, std::io::Error> {
+        Ok(ImplMapRow {
+            mapping_flags: PInvokeAttributes::from(buffer.read_u16()?),
+            member_forwarded: CodedIndex::read(buffer, CodedIndexTag::MemberForwarded)?,
+            import_name: StringIndex::read(buffer)?,
+            import_scope: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::ModuleRef,
+            }
+        })
+    }
+}
+
+/// # II.22.23 InterfaceImpl : 0x09
+/// 
+/// The *InterfaceImpl* table has the following columns:
+/// * *Class* (an index into the *TypeDef* table)
+/// * *Interface* (an index into the *TypeDef*, *TypeRef*, or *TypeSpec* table; more precisely, a *TypeDefOrRef*  (§II.24.2.6) coded index) 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct InterfaceImplRow {
+    pub class: CodedIndex,
+    pub interface: CodedIndex,
+}
+
+impl TableRow for InterfaceImplRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<InterfaceImplRow, std::io::Error> {
+        Ok(InterfaceImplRow {
+            class: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+            interface: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+        })
+    }
+}
+
+/// # II.22.24 ManifestResource : 0x28 
+/// 
+/// The *ManifestResource* table has the following columns:
+/// * *Offset* (a 4-byte constant)
+/// * *Flags* (a 4-byte bitmask of type *ManifestResourceAttributes*, §II.23.1.9)
+/// * *Name* (an index into the String heap)
+/// * *Implementation* (an index into a *File* table, a *AssemblyRef* table, or null; more precisely, an *Implementation* (§II.24.2.6) coded index) 
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ManifestResourceRow {
+    pub offset: u32,
+    pub flags: ManifestResourceAttributes,
+    pub name: StringIndex,
+    pub implementation: CodedIndex,
+}
+
+impl TableRow for ManifestResourceRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<ManifestResourceRow, std::io::Error> {
+        Ok(ManifestResourceRow {
+            offset: buffer.read_u32()?,
+            flags: ManifestResourceAttributes::from(buffer.read_u32()?),
+            name: StringIndex::read(buffer)?,
+            implementation: CodedIndex::read(buffer, CodedIndexTag::Implementation)?,
+        })
+    }
+}
 
 /// # II.22.25 MemberRef : 0x0A
 ///  
@@ -359,9 +722,80 @@ impl TableRow for MethodDefRow {
     }
 }
 
-// TODO: MethodImpl
-// TODO: MethodSemantics
-// TODO: MethodSpec
+/// # II.22.27 MethodImpl : 0x19
+/// 
+/// [...]
+/// 
+/// The *MethodImpl* table has the following columns: 
+/// * *Class* (an index into the *TypeDef* table)
+/// * *MethodBody* (an index into the *MethodDef* or *MemberRef* table; more precisely, a *MethodDefOrRef* (§II.24.2.6) coded index)
+/// * *MethodDeclaration* (an index into the *MethodDef* or *MemberRef* table; more precisely, a *MethodDefOrRef* (§II.24.2.6) coded index)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MethodImplRow {
+    pub class: CodedIndex,
+    pub method_body: CodedIndex,
+    pub method_declaration: CodedIndex,
+}
+
+impl TableRow for MethodImplRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodImplRow, std::io::Error> {
+        Ok(MethodImplRow {
+            class: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+            method_body: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
+            method_declaration: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
+        })
+    }
+}
+
+/// # II.22.28 MethodSemantics : 0x18
+/// 
+/// The *MethodSemantics* table has the following columns: 
+/// * *Semantics* (a 2-byte bitmask of type *MethodSemanticsAttributes*, §II.23.1.12)
+/// * *Method* (an index into the *MethodDef* table)
+/// * *Association* (an index into the *Event* or *Property* table; more precisely, a *HasSemantics* (§II.24.2.6) coded index)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MethodSemanticsRow {
+    pub semantics: MethodSemanticsAttributes,
+    pub method: CodedIndex,
+    pub association: CodedIndex,
+}
+
+impl TableRow for MethodSemanticsRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodSemanticsRow, std::io::Error> {
+        Ok(MethodSemanticsRow {
+            semantics: MethodSemanticsAttributes::from(buffer.read_u16()?),
+            method: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::MethodDef,
+            },
+            association: CodedIndex::read(buffer, CodedIndexTag::HasSemantics)?,
+        })
+    }
+}
+
+/// # II.22.29 MethodSpec : 0x2B
+/// 
+/// The *MethodSpec* table has the following columns:
+/// * *Method* (an index into the *MethodDef* or *MemberRef* table, specifying to which generic method this row refers; that is,
+///   which generic method this row is an instantiation of; more precisely, a *MethodDefOrRef* (§II.24.2.6) coded index)
+/// * *Instantiation* (an index into the Blob heap (§II.23.2.15), holding the signature of this instantiation)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct MethodSpecRow {
+    pub method: CodedIndex,
+    pub instantiation: BlobIndex,
+}
+
+impl TableRow for MethodSpecRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodSpecRow, std::io::Error> {
+        Ok(MethodSpecRow {
+            method: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
+            instantiation: BlobIndex::read(buffer)?,
+        })
+    }
+}
 
 /// # II.22.30 Module : 0x00
 /// 
@@ -392,8 +826,48 @@ impl TableRow for ModuleRow {
     }
 }
 
-// TODO: ModuleRef
-// TODO: NestedClass
+/// # II.22.31 ModuleRef : 0x1A
+///
+/// The *ModuleRef* table has the following columns:
+/// * *Name* (an index into the String heap)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ModuleRefRow {
+    pub name: StringIndex,
+}
+
+impl TableRow for ModuleRefRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<ModuleRefRow, std::io::Error> {
+        Ok(ModuleRefRow {
+            name: StringIndex::read(buffer)?,
+        })
+    }
+}
+
+/// # II.22.32 NestedClass : 0x29
+/// 
+/// The *NestedClass* table has the following columns: 
+/// * *NestedClass* (an index into the *TypeDef* table) 
+/// * *EnclosingClass* (an index into the *TypeDef* table)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct NestedClassRow {
+    pub nested_class: CodedIndex,
+    pub enclosing_class: CodedIndex,
+}
+
+impl TableRow for NestedClassRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<NestedClassRow, std::io::Error> {
+        Ok(NestedClassRow {
+            nested_class: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+            enclosing_class: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+        })
+    }
+}
 
 /// II.22.33 Param : 0x08
 /// 
@@ -420,9 +894,80 @@ impl TableRow for ParamRow {
     }
 }
 
-// TODO: Property
-// TODO: PropertyMap
-// TODO: StandAloneSig
+/// # II.22.34 Property : 0x17
+/// 
+/// [...]
+/// 
+/// The *Property* ( 0x17 ) table has the following columns:
+/// * *Flags* (a 2-byte bitmask of type PropertyAttributes, §II.23.1.14)
+/// * *Name* (an index into the String heap)
+/// * *Type* (an index into the Blob heap)
+///   (The name of this column is misleading. It does not index a *TypeDef* or *TypeRef* table—instead it indexes the signature in the Blob heap of the Property)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PropertyRow {
+    pub flags: PropertyAttributes,
+    pub name: StringIndex,
+    pub type_: BlobIndex,
+}
+
+impl TableRow for PropertyRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<PropertyRow, std::io::Error> {
+        Ok(PropertyRow {
+            flags: PropertyAttributes::from(buffer.read_u16()?),
+            name: StringIndex::read(buffer)?,
+            type_: BlobIndex::read(buffer)?,
+        })
+    }
+}
+
+/// # II.22.35 PropertyMap : 0x15
+/// 
+/// The *PropertyMap* table has the following columns:
+/// * *Parent* (an index into the *TypeDef* table) 
+/// * *PropertyList* (an index into the *Property* table). It marks the first of a contiguous run of Properties owned by *Parent*.
+///   The run continues to the smaller of:
+///     * the last row of the *Property* table
+///     * the next run of Properties, found by inspecting the *PropertyList* of the next row in this *PropertyMap* table
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PropertyMapRow {
+    pub parent: CodedIndex,
+    pub property_list: CodedIndex,
+}
+
+impl TableRow for PropertyMapRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<PropertyMapRow, std::io::Error> {
+        Ok(PropertyMapRow {
+            parent: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::TypeDef,
+            },
+            property_list: CodedIndex {
+                index: buffer.read_u16()? as u32,
+                table: TableKind::Property,
+            },
+        })
+    }
+}
+
+/// # II.22.36 StandAloneSig : 0x11
+/// 
+/// [...]
+/// 
+/// The *StandAloneSig* table has the following column:
+///  * *Signature* (an index into the Blob heap)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct StandAloneSigRow {
+    pub signature: BlobIndex,
+}
+
+impl TableRow for StandAloneSigRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<StandAloneSigRow, std::io::Error> {
+        Ok(StandAloneSigRow {
+            signature: BlobIndex::read(buffer)?,
+        })
+    }
+    
+}
 
 /// # II.22.37 TypeDef : 0x02
 /// The *TypeDef* table has the following columns:
@@ -494,4 +1039,21 @@ impl TableRow for TypeRefRow {
     }
 }
 
-// TODO: TypeSpec
+/// # II.22.39 TypeSpec : 0x1B
+/// 
+///  [...]
+/// 
+/// The *TypeSpec* table has the following column: 
+/// * *Signature* (index into the Blob heap, where the blob is formatted as specified in §II.23.2.14)
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TypeSpecRow {
+    pub signature: BlobIndex,
+}
+
+impl TableRow for TypeSpecRow {
+    fn read_from(buffer: &mut BufReader<File>) -> Result<TypeSpecRow, std::io::Error> {
+        Ok(TypeSpecRow {
+            signature: BlobIndex::read(buffer)?,
+        })
+    }
+}

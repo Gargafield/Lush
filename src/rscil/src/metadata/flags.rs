@@ -28,6 +28,30 @@ impl AssemblyFlags {
     }
 }
 
+/// II.23.1.4 Flags for events [EventAttributes] 
+///
+/// | Flag            | Value    | Description | 
+/// | --------------- | -------- | ----------- |
+/// | `SpecialName`   | `0x0200` | Event is special. |
+/// | `RTSpecialName` | `0x0400` | CLI provides 'special' behavior, depending upon the name of the event |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EventAttributes(u16);
+
+impl From<u16> for EventAttributes {
+    fn from(value: u16) -> Self {
+        EventAttributes(value)
+    }
+}
+
+impl EventAttributes {
+    const SPECIAL_NAME: u16 = 0x0200;
+    const RT_SPECIAL_NAME: u16 = 0x0400;
+
+    pub fn check_flag(&self, flag: u16) -> bool {
+        self.0 & flag == flag
+    }
+}
+
 /// II.23.1.5 Flags for fields [FieldAttributes]
 /// 
 /// | Flag                    | Value    | Description                                                                 |
@@ -82,7 +106,142 @@ impl FieldAttributes {
     const HAS_FIELD_RVA: u16 = 0x0100;
 }
 
+/// II.23.1.6 Flags for files [FileAttributes]
+/// 
+/// | Flag                 | Value    | Description  |
+/// | -------------------- | -------- | ------------ |
+/// | `ContainsMetaData`   | `0x0000` | This is not a resource file  |
+/// | `ContainsNoMetaData` | `0x0001` | This is a resource file or other non-metadata-containing file |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct FileAttributes(u32);
+
+impl From<u32> for FileAttributes {
+    fn from(value: u32) -> Self {
+        FileAttributes(value)
+    }
+}
+
+impl FileAttributes {
+    const CONTAINS_META_DATA: u32 = 0x0000;
+    const CONTAINS_NO_META_DATA: u32 = 0x0001;
+
+    pub fn check_flag(&self, flag: u32) -> bool {
+        self.0 & flag == flag
+    }
+}
+
+/// II.23.1.7 Flags for Generic Parameters [GenericParamAttributes] 
+/// 
+/// | Flag                               | Value    | Description |
+/// | ---------------------------------- | -------- | ----------- |
+/// | `VarianceMask`                     | `0x0003` | These 2 bits contain one of the following values: |
+/// | - `None`                           | `0x0000` | The generic parameter is non-variant and has no special constraints |
+/// | - `Covariant`                      | `0x0001` | The generic parameter is covariant |
+/// | - `Contravariant`                  | `0x0002` | The generic parameter is contravariant |
+/// | `SpecialConstraintMask`            | `0x001C` | These 3 bits contain one of the following values: |
+/// | - `ReferenceTypeConstraint`        | `0x0004` | The generic parameter has the class special constraint |
+/// | - `NotNullableValueTypeConstraint` | `0x0008` | The generic parameter has the valuetype special constraint |
+/// | - `DefaultConstructorConstraint`   | `0x0010` | The generic parameter has the .ctor special constraint|
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct GenericParamAttributes(u16);
+
+impl From<u16> for GenericParamAttributes {
+    fn from(value: u16) -> Self {
+        GenericParamAttributes(value)
+    }
+}
+
+impl GenericParamAttributes {
+    const VARIANCE_MASK: u16 = 0x0003;
+    const NONE: u16 = 0x0000;
+    const COVARIANT: u16 = 0x0001;
+    const CONTRAVARIANT: u16 = 0x0002;
+    const SPECIAL_CONSTRAINT_MASK: u16 = 0x001C;
+    const REFERENCE_TYPE_CONSTRAINT: u16 = 0x0004;
+    const NOT_NULLABLE_VALUE_TYPE_CONSTRAINT: u16 = 0x0008;
+    const DEFAULT_CONSTRUCTOR_CONSTRAINT: u16 = 0x0010;
+
+    pub fn check_flag(&self, flag: u16) -> bool {
+        self.0 & flag == flag
+    }
+}
+
+/// II.23.1.8 Flags for ImplMap [PInvokeAttributes] 
+/// 
+/// | Flag                    | Value    | Description |
+/// | ----------------------- | -------- | ----------- |
+/// | `NoMangle`              | `0x0001` | PInvoke is to use the member name as specified |
+/// | Character set           |          | | 
+/// | `CharSetMask`           | `0x0006` | This is a resource file or other non-metadata-containing file. These 2 bits contain one of the following values: |
+/// | - `CharSetNotSpec`      | `0x0000` | |
+/// | - `CharSetAnsi`         | `0x0002` | |
+/// | - `CharSetUnicode`      | `0x0004` | |
+/// | - `CharSetAuto`         | `0x0006` | |
+/// | `SupportsLastError`     | `0x0040` | Information about target function. Not relevant for fields |
+/// | Calling convention      |          | | 
+/// | `CallConvMask`          | `0x0700` | These 3 bits contain one of the following values: |
+/// | - `CallConvPlatformapi` | `0x0100` | |
+/// | - `CallConvCdecl`       | `0x0200` | |
+/// | - `CallConvStdcall`     | `0x0300` | |
+/// | - `CallConvThiscall`    | `0x0400` | |
+/// | - `CallConvFastcall`    | `0x0500` | |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PInvokeAttributes(u16);
+
+impl From<u16> for PInvokeAttributes {
+    fn from(value: u16) -> Self {
+        PInvokeAttributes(value)
+    }
+}
+
+impl PInvokeAttributes {
+    const NO_MANGLE: u16 = 0x0001;
+    const CHAR_SET_MASK: u16 = 0x0006;
+    const CHAR_SET_NOT_SPEC: u16 = 0x0000;
+    const CHAR_SET_ANSI: u16 = 0x0002;
+    const CHAR_SET_UNICODE: u16 = 0x0004;
+    const CHAR_SET_AUTO: u16 = 0x0006;
+    const SUPPORTS_LAST_ERROR: u16 = 0x0040;
+    const CALL_CONV_MASK: u16 = 0x0700;
+    const CALL_CONV_PLATFORM_API: u16 = 0x0100;
+    const CALL_CONV_CDECL: u16 = 0x0200;
+    const CALL_CONV_STDCALL: u16 = 0x0300;
+    const CALL_CONV_THISCALL: u16 = 0x0400;
+    const CALL_CONV_FASTCALL: u16 = 0x0500;
+
+    pub fn check_flag(&self, flag: u16) -> bool {
+        self.0 & flag == flag
+    }
+}
+
+/// II.23.1.9 Flags for ManifestResource [ManifestResourceAttributes] 
+///
+/// | Flag             | Value    | Description |
+/// | ---------------- | -------- | ----------- |
+/// | `VisibilityMask` | `0x0007` | These 3 bits contain one of the following values: |
+/// | `Public`         | `0x0001` | The Resource is exported from the Assembly |
+/// | `Private`        | `0x0002` | The Resource is private to the Assembly |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ManifestResourceAttributes(u32);
+
+impl From<u32> for ManifestResourceAttributes {
+    fn from(value: u32) -> Self {
+        ManifestResourceAttributes(value)
+    }
+}
+
+impl ManifestResourceAttributes {
+    const VISIBILITY_MASK: u32 = 0x0007;
+    const PUBLIC: u32 = 0x0001;
+    const PRIVATE: u32 = 0x0002;
+
+    pub fn check_flag(&self, flag: u32) -> bool {
+        self.0 & flag == flag
+    }
+}
+
 /// II.23.1.10 Flags for methods [MethodAttributes]
+/// 
 /// | Flag                   | Value    | Description |
 /// | ---------------------- | -------- | ----------- |
 /// | `MemberAccessMask`     | `0x0007` | These 3 bits contain one of the following values: |
@@ -199,6 +358,38 @@ impl MethodImplAttributes {
     }
 }
 
+/// # II.23.1.12 Flags for MethodSemantics [MethodSemanticsAttributes] 
+/// 
+/// | Flag       | Value    | Description |
+/// | ---------- | -------- | ----------- |
+/// | `Setter`   | `0x0001` | Setter for property |
+/// | `Getter`   | `0x0002` | Getter for property |
+/// | `Other`    | `0x0004` | Other method for property or event |
+/// | `AddOn`    | `0x0008` | AddOn method for event. This refers to the required `add_` method for events.  (§22.13) |
+/// | `RemoveOn` | `0x0010` | RemoveOn method for event. . This refers to the required `remove_` method for events. (§22.13) |
+/// | `Fire`     | `0x0020` | Fire method for event. This refers to the optional `raise_` method for events. (§22.13)|
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct MethodSemanticsAttributes(u16);
+
+impl From<u16> for MethodSemanticsAttributes {
+    fn from(value: u16) -> Self {
+        MethodSemanticsAttributes(value)
+    }
+}
+
+impl MethodSemanticsAttributes {
+    const SETTER: u16 = 0x0001;
+    const GETTER: u16 = 0x0002;
+    const OTHER: u16 = 0x0004;
+    const ADD_ON: u16 = 0x0008;
+    const REMOVE_ON: u16 = 0x0010;
+    const FIRE: u16 = 0x0020;
+
+    pub fn check_flag(&self, flag: u16) -> bool {
+        self.0 & flag == flag
+    }
+}
+
 /// # II.23.1.13 Flags for params [ParamAttributes] 
 /// | Flag              | Value    | Description |
 /// | ----------------- | -------- | ----------- |
@@ -230,7 +421,36 @@ impl ParamAttributes {
     }
 }
 
+/// # II.23.1.14 Flags for properties [PropertyAttributes] 
+/// 
+/// | Flag            | Value    | Description |
+/// | --------------- | -------- | ----------- |
+/// | `SpecialName`   | `0x0200` | Property is special |
+/// | `RTSpecialName` | `0x0400` | Runtime(metadata internal APIs) should check name encoding |
+/// | `HasDefault`    | `0x1000` | Property has default |
+/// | `Unused`        | `0xe9ff` | Reserved: shall be zero in a conforming implementation |
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PropertyAttributes(u16);
+
+impl From<u16> for PropertyAttributes {
+    fn from(value: u16) -> Self {
+        PropertyAttributes(value)
+    }
+}
+
+impl PropertyAttributes {
+    const SPECIAL_NAME: u16 = 0x0200;
+    const RT_SPECIAL_NAME: u16 = 0x0400;
+    const HAS_DEFAULT: u16 = 0x1000;
+    const UNUSED: u16 = 0xe9ff;
+
+    pub fn check_flag(&self, flag: u16) -> bool {
+        self.0 & flag == flag
+    }
+}
+
 /// # II.23.1.15 Flags for types [TypeAttributes] 
+/// 
 /// | Flag                                             | Value        | Description |
 /// | ------------------------------------------------ | ------------ | ----------- |
 /// | Visibility attributes                            |              | |
