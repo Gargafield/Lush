@@ -1,6 +1,5 @@
-use std::{fs::File, io::{BufRead, BufReader, Read}};
 
-use crate::metadata::bufreader_extension::BufReaderExtension;
+use super::PeParser;
 
 /// # II.24.2 File headers
 /// ## II.24.2.1 Metadata root
@@ -35,7 +34,7 @@ pub struct MetadataHeader {
 }
 
 impl MetadataHeader {
-    pub fn from(buffer: &mut BufReader<File>) -> Result<MetadataHeader, std::io::Error> {
+    pub fn from(buffer: &mut PeParser) -> Result<MetadataHeader, std::io::Error> {
         let signature = buffer.read_u32()?;
 
         // See Description of Signature field in the table above
@@ -92,7 +91,7 @@ pub struct StreamHeader {
 }
 
 impl StreamHeader {
-    pub fn from(buffer: &mut BufReader<File>) -> Result<StreamHeader, std::io::Error> {
+    pub fn from(buffer: &mut PeParser) -> Result<StreamHeader, std::io::Error> {
         let offset = buffer.read_u32()?;
         let size = buffer.read_u32()?;
 

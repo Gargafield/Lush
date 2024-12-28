@@ -1,8 +1,14 @@
+use std::{collections::HashMap, io::BufRead};
+
+use streams::HeapSizes;
+
 use super::*;
 
 pub struct PeParser {
     filename : String,
     buffer : BufReader<File>,
+    row_count: HashMap<TableKind, u32>,
+    heap_sizes: HeapSizes,
 }
 
 // II.25.2.1 MS-DOS header
@@ -36,7 +42,9 @@ impl PeParser {
     pub fn new(filename: &str, buffer: BufReader<File>) -> PeParser {
         PeParser {
             filename: filename.to_string(),
-            buffer: buffer,
+            buffer,
+            row_count: HashMap::new(),
+            heap_sizes: HeapSizes::from(0u8),
         }
     }
 
@@ -138,13 +146,13 @@ impl PeParser {
     /// See [`MetadataHeader`] struct for more information.
     fn read_metadata_header(&mut self, cli_header: &CliHeader, sections: &Vec<SectionHeader>) -> Result<MetadataHeader, std::io::Error> {
         self.seek_rva(sections, cli_header.meta_data.rva);
-        MetadataHeader::from(&mut self.buffer)
+        MetadataHeader::from(self)
     }
 
     /// # II.24.2.2 Stream header
     /// See [`Streams`] struct for more information.
     fn read_streams(&mut self, root_address: u64, headers: &Vec<StreamHeader>) -> Result<streams::Streams, std::io::Error> {
-        Streams::from(&mut self.buffer, root_address, headers)
+        Streams::from(self, root_address, headers)
     }
 
     /// II.25 File format extensions to PE 
@@ -168,5 +176,131 @@ impl PeParser {
             }
         }
         panic!("RVA not found in any section");
+    }
+
+    pub fn seek(&mut self, position: u64) -> std::io::Result<u64> {
+        self.buffer.seek(SeekFrom::Start(position))
+    }
+
+    pub fn read_u64(&mut self) -> Result<u64, std::io::Error> {
+        let mut buffer = [0u8; 8];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(u64::from_le_bytes(buffer))
+    }
+
+    pub fn read_u32(&mut self) -> Result<u32, std::io::Error> {
+        let mut buffer = [0u8; 4];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(u32::from_le_bytes(buffer))
+    }
+
+    pub fn read_u16(&mut self) -> Result<u16, std::io::Error> {
+        let mut buffer = [0u8; 2];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(u16::from_le_bytes(buffer))
+    }
+
+    pub fn read_u8(&mut self) -> Result<u8, std::io::Error> {
+        let mut buffer = [0u8; 1];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(u8::from_le_bytes(buffer))
+    }
+
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
+    pub fn read_string_index(&mut self) -> Result<StringIndex, std::io::Error> {
+        if self.heap_sizes.string_size() == 2 {
+            return Ok(StringIndex::from(self.read_u16()?));
+        }
+        else {
+            return Ok(StringIndex::from(self.read_u32()?));
+        }
+    }
+
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
+    pub fn read_blob_index(&mut self) -> Result<BlobIndex, std::io::Error> {
+        if self.heap_sizes.blob_size() == 2 {
+            return Ok(BlobIndex::from(self.read_u16()?));
+        }
+        else {
+            return Ok(BlobIndex::from(self.read_u32()?));
+        }
+    }
+
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
+    pub fn read_guid_index(&mut self) -> Result<GuidIndex, std::io::Error> {
+        if self.heap_sizes.guid_size() == 2 {
+            return Ok(GuidIndex::from(self.read_u16()?));
+        }
+        else {
+            return Ok(GuidIndex::from(self.read_u32()?));
+        }
+    }
+
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If e is a simple index into a table with index i, it is stored using 2 bytes if table i has less than 2<sup>16</sup> rows, otherwise it is stored using 4 bytes. 
+    pub fn read_table_index(&mut self, kind: TableKind) -> Result<CodedIndex, std::io::Error> {
+        let row_count = self.row_count.get(&kind).unwrap_or(&0);
+        if *row_count < 0x10000 {
+            return Ok(CodedIndex::from(kind, self.read_u16()? as u32));
+        }
+        else {
+            return Ok(CodedIndex::from(kind, self.read_u32()?));
+        }
+    }
+    
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If *e* is a *coded index* that points into table *t<sub>i</sub>* out of *n* possible tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, then it 
+    ///   is stored as e << (log n) | tag{*t<sub>0</sub>*, ...*t<sub>n-1</sub>*}[*t<sub>i</sub>] using 2 bytes if the maximum number 
+    ///   of rows of tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, is less than 2<sup>(16 – (log n))</sup>, and using 4 bytes otherwise.
+    ///   The family of finite maps tag{*t<sub>0</sub>, ...*t<sub>n-1</sub>*} is defined below. Note that decoding a physical 
+    ///   row requires the inverse of this mapping. [For example, the Parent column of the 
+    ///   *Constant* table indexes a row in the *Field*, *Param*, or *Property* tables.  The actual 
+    ///   table is encoded into the low 2 bits of the number, using the values: 0 => *Field*, 1 => 
+    ///   *Param*, 2 => *Property*. The remaining bits hold the actual row number being 
+    ///   indexed. For example, a value of `0x321`, indexes row number `0xC8` in the *Param* table.]
+    pub fn read_coded_index(&mut self, tag: CodedIndexTag) -> Result<CodedIndex, std::io::Error> {
+        let index: u32 = if tag.is_big_index(|kind| *self.row_count.get(&kind).unwrap_or(&0)) {
+            self.read_u32()?
+        } else {
+            self.read_u16()? as u32
+        };
+
+        let data = index >> tag.get_tag_size();
+        let table = tag.get_table_kind((index & 0xff) as u8);
+        Ok(CodedIndex::from(table, data))
+    }
+
+    pub fn read_exact(&mut self, buffer: &mut [u8]) -> Result<(), std::io::Error> {
+        self.buffer.read_exact(buffer)
+    }
+
+    pub fn read_until(&mut self, byte: u8, buffer: &mut Vec<u8>) -> Result<usize, std::io::Error> {
+        self.buffer.read_until(byte, buffer)
+    }
+
+    pub fn set_row_count(&mut self, kind: TableKind, count: u32) {
+        self.row_count.insert(kind, count);
+    }
+
+    pub fn set_heap_sizes(&mut self, sizes: HeapSizes) {
+        self.heap_sizes = sizes;
     }
 }

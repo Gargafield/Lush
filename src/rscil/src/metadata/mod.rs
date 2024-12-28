@@ -7,7 +7,6 @@ mod data_directories;
 mod section_header;
 mod cli_header;
 mod metadata_header;
-mod bufreader_extension;
 mod streams;
 mod image;
 mod parser;

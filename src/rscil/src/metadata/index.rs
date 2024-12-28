@@ -1,35 +1,48 @@
-use std::{fs::File, io::BufReader};
 
-use super::{bufreader_extension::BufReaderExtension, TableKind};
-
-// TODO: Dynamic size for indexes, see II.24.2.6 #~ stream
-
-pub trait Index {
-    fn read(buffer: &mut BufReader<File>) -> Result<Self, std::io::Error> where Self: Sized;
-}
+use crate::*;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct StringIndex(pub u32);
 
-impl Index for StringIndex {
-    fn read(buffer: &mut BufReader<File>) -> Result<StringIndex, std::io::Error> {
-        Ok(StringIndex(buffer.read_u16()? as u32))
+impl From<u32> for StringIndex {
+    fn from(value: u32) -> Self {
+        StringIndex(value)
+    }
+}
+
+impl From<u16> for StringIndex {
+    fn from(value: u16) -> Self {
+        StringIndex(value as u32)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct GuidIndex(pub u32);
-impl Index for GuidIndex {
-    fn read(buffer: &mut BufReader<File>) -> Result<GuidIndex, std::io::Error> {
-        Ok(GuidIndex(buffer.read_u16()? as u32))
+
+impl From<u32> for GuidIndex {
+    fn from(value: u32) -> Self {
+        GuidIndex(value)
+    }
+}
+
+impl From<u16> for GuidIndex {
+    fn from(value: u16) -> Self {
+        GuidIndex(value as u32)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BlobIndex(pub u32);
-impl Index for BlobIndex {
-    fn read(buffer: &mut BufReader<File>) -> Result<BlobIndex, std::io::Error> {
-        Ok(BlobIndex(buffer.read_u16()? as u32))
+
+impl From<u32> for BlobIndex {
+    fn from(value: u32) -> Self {
+        BlobIndex(value)
+    }
+}
+
+impl From<u16> for BlobIndex {
+    fn from(value: u16) -> Self {
+        BlobIndex(value as u32)
     }
 }
 
@@ -280,6 +293,116 @@ impl CodedIndexTag {
             },
         }
     }
+
+    /// If  e is a coded index that points into table ti out of n possible tables t0, …tn-1, then it 
+    /// is stored as e << (log n) | tag{ t0, …tn-1}[ ti] using 2 bytes if the maximum number 
+    /// of rows of tables t0, …tn-1, is less than 2<sup>(16 – (log n))</sup>, and using 4 bytes otherwise
+    pub fn is_big_index(&self, row_count: impl Fn(TableKind) -> u32) -> bool {
+        match self {
+            CodedIndexTag::TypeDefOrRef => {
+                let max = row_count(TableKind::TypeDef)
+                    .max(row_count(TableKind::TypeRef)
+                    .max(row_count(TableKind::TypeSpec)));
+                max > 2u32.pow(16 - 2)
+            },
+            CodedIndexTag::HasConstant => {
+                let max = row_count(TableKind::Field)
+                    .max(row_count(TableKind::Param)
+                    .max(row_count(TableKind::Property)));
+                max > 2u32.pow(16 - 2)
+            },
+            CodedIndexTag::HasCustomAttribute => {
+                let max = row_count(TableKind::MethodDef)
+                    .max(row_count(TableKind::Field)
+                    .max(row_count(TableKind::TypeRef)
+                    .max(row_count(TableKind::TypeDef)
+                    .max(row_count(TableKind::Param)
+                    .max(row_count(TableKind::InterfaceImpl)
+                    .max(row_count(TableKind::MemberRef)
+                    .max(row_count(TableKind::Module)
+                    .max(row_count(TableKind::Property)
+                    .max(row_count(TableKind::Event)
+                    .max(row_count(TableKind::StandAloneSig)
+                    .max(row_count(TableKind::ModuleRef)
+                    .max(row_count(TableKind::TypeSpec)
+                    .max(row_count(TableKind::Assembly)
+                    .max(row_count(TableKind::AssemblyRef)
+                    .max(row_count(TableKind::File)
+                    .max(row_count(TableKind::ExportedType)
+                    .max(row_count(TableKind::ManifestResource)
+                    .max(row_count(TableKind::GenericParam)
+                    .max(row_count(TableKind::GenericParamConstraint)
+                    .max(row_count(TableKind::MethodSpec)))))))))))))))))))));
+
+                max > 2u32.pow(16 - 5)
+            },
+            CodedIndexTag::HasFieldMarshal => {
+                let max = row_count(TableKind::Field)
+                    .max(row_count(TableKind::Param));
+                max > 2u32.pow(16 - 1)
+            },
+            CodedIndexTag::HasDeclSecurity => {
+                let max = row_count(TableKind::TypeDef)
+                    .max(row_count(TableKind::MethodDef)
+                    .max(row_count(TableKind::Assembly)));
+                max > 2u32.pow(16 - 2)
+            },
+            CodedIndexTag::MemberRefParent => {
+                let max = row_count(TableKind::TypeDef)
+                    .max(row_count(TableKind::TypeRef)
+                    .max(row_count(TableKind::ModuleRef)
+                    .max(row_count(TableKind::MethodDef)
+                    .max(row_count(TableKind::TypeSpec)))));
+
+                max > 2u32.pow(16 - 3)
+            },
+            CodedIndexTag::HasSemantics => {
+                let max = row_count(TableKind::Event)
+                    .max(row_count(TableKind::Property));
+
+                max > 2u32.pow(16 - 1)
+            },
+            CodedIndexTag::MethodDefOrRef => {
+                let max = row_count(TableKind::MethodDef)
+                    .max(row_count(TableKind::MemberRef));
+
+                max > 2u32.pow(16 - 1)
+            },
+            CodedIndexTag::MemberForwarded => {
+                let max = row_count(TableKind::Field)
+                    .max(row_count(TableKind::MethodDef));
+
+                max > 2u32.pow(16 - 1)
+            },
+            CodedIndexTag::Implementation => {
+                let max = row_count(TableKind::File)
+                    .max(row_count(TableKind::AssemblyRef)
+                    .max(row_count(TableKind::ExportedType)));
+
+                max > 2u32.pow(16 - 2)
+            },
+            CodedIndexTag::CustomAttributeType => {
+                let max = row_count(TableKind::MethodDef)
+                    .max(row_count(TableKind::MemberRef));
+
+                max > 2u32.pow(16 - 3)
+            },
+            CodedIndexTag::ResolutionScope => {
+                let max = row_count(TableKind::Module)
+                    .max(row_count(TableKind::ModuleRef)
+                    .max(row_count(TableKind::AssemblyRef)
+                    .max(row_count(TableKind::TypeRef))));
+
+                max > 2u32.pow(16 - 2)
+            },
+            CodedIndexTag::TypeOrMethodDef => {
+                let max = row_count(TableKind::TypeDef)
+                    .max(row_count(TableKind::MethodDef));
+
+                max > 2u32.pow(16 - 1)
+            },
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -289,15 +412,10 @@ pub struct CodedIndex {
 }
 
 impl CodedIndex {
-    pub fn read(buffer: &mut BufReader<File>, tag: CodedIndexTag) -> Result<CodedIndex, std::io::Error> {
-        let index = buffer.read_u16()?;
-        
-        let data_index = index >> tag.get_tag_size();
-        let table = tag.get_table_kind((index & 0xFF) as u8);
-
-        Ok(CodedIndex {
+    pub fn from(table: TableKind, index: u32) -> Self {
+        CodedIndex {
             table,
-            index: data_index as u32,
-        })
+            index,
+        }
     }
 }

@@ -128,50 +128,53 @@ impl TableKind {
         let mut kinds = Vec::new();
         for i in 0..64 {
             if (bitmask & (1 << i)) != 0 {
-                kinds.push(TableKind::into(i));
+                kinds.push(TableKind::into(i).unwrap());
             }
         }
         kinds
     }
 
-    fn into(index: usize) -> TableKind {
+    fn into(index: usize) -> Option<TableKind> {
         match index {
-            0x20 => TableKind::Assembly,
-            0x22 => TableKind::AssemblyOS,
-            0x21 => TableKind::AssemblyProcessor,
-            0x23 => TableKind::AssemblyRef,
-            0x25 => TableKind::AssemblyRefOS,
-            0x24 => TableKind::AssemblyRefProcessor,
-            0x0f => TableKind::ClassLayout,
-            0x0b => TableKind::Constant,
-            0x0c => TableKind::CustomAttribute,
-            0x0e => TableKind::DeclSecurity,
-            0x12 => TableKind::EventMap,
-            0x14 => TableKind::Event,
-            0x04 => TableKind::Field,
-            0x10 => TableKind::FieldLayout,
-            0x0d => TableKind::FieldMarshal,
-            0x1d => TableKind::FieldRVA,
-            0x2a => TableKind::GenericParam,
-            0x2c => TableKind::GenericParamConstraint,
-            0x1c => TableKind::ImplMap,
-            0x09 => TableKind::InterfaceImpl,
-            0x28 => TableKind::ManifestResource,
-            0x0a => TableKind::MemberRef,
-            0x06 => TableKind::MethodDef,
-            0x19 => TableKind::MethodImpl,
-            0x18 => TableKind::MethodSemantics,
-            0x00 => TableKind::Module,
-            0x1a => TableKind::ModuleRef,
-            0x29 => TableKind::NestedClass,
-            0x08 => TableKind::Param,
-            0x17 => TableKind::Property,
-            0x15 => TableKind::PropertyMap,
-            0x11 => TableKind::StandAloneSig,
-            0x02 => TableKind::TypeDef,
-            0x01 => TableKind::TypeRef,
-            0x1b => TableKind::TypeSpec,
-            _ => panic!("Unknown table kind: 0x{:02x}", index),
+            0x20 => Some(TableKind::Assembly),
+            0x22 => Some(TableKind::AssemblyOS),
+            0x21 => Some(TableKind::AssemblyProcessor),
+            0x23 => Some(TableKind::AssemblyRef),
+            0x25 => Some(TableKind::AssemblyRefOS),
+            0x24 => Some(TableKind::AssemblyRefProcessor),
+            0x0f => Some(TableKind::ClassLayout),
+            0x0b => Some(TableKind::Constant),
+            0x0c => Some(TableKind::CustomAttribute),
+            0x0e => Some(TableKind::DeclSecurity),
+            0x12 => Some(TableKind::EventMap),
+            0x14 => Some(TableKind::Event),
+            0x27 => Some(TableKind::ExportedType),
+            0x04 => Some(TableKind::Field),
+            0x10 => Some(TableKind::FieldLayout),
+            0x0d => Some(TableKind::FieldMarshal),
+            0x1d => Some(TableKind::FieldRVA),
+            0x26 => Some(TableKind::File),
+            0x2a => Some(TableKind::GenericParam),
+            0x2c => Some(TableKind::GenericParamConstraint),
+            0x1c => Some(TableKind::ImplMap),
+            0x09 => Some(TableKind::InterfaceImpl),
+            0x28 => Some(TableKind::ManifestResource),
+            0x0a => Some(TableKind::MemberRef),
+            0x06 => Some(TableKind::MethodDef),
+            0x19 => Some(TableKind::MethodImpl),
+            0x18 => Some(TableKind::MethodSemantics),
+            0x2b => Some(TableKind::MethodSpec),
+            0x00 => Some(TableKind::Module),
+            0x1a => Some(TableKind::ModuleRef),
+            0x29 => Some(TableKind::NestedClass),
+            0x08 => Some(TableKind::Param),
+            0x17 => Some(TableKind::Property),
+            0x15 => Some(TableKind::PropertyMap),
+            0x11 => Some(TableKind::StandAloneSig),
+            0x02 => Some(TableKind::TypeDef),
+            0x01 => Some(TableKind::TypeRef),
+            0x1b => Some(TableKind::TypeSpec),
+            _ => None,
         }
     }
 
@@ -217,5 +220,4 @@ impl TableKind {
             TableKind::TypeSpec => 0x1b,
         }
     }
-    
 }

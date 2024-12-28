@@ -1,6 +1,4 @@
-use std::{collections::HashMap, fs::File, io::{BufRead, BufReader, Read, Seek}};
-
-use metadata::bufreader_extension::BufReaderExtension;
+use std::collections::HashMap;
 
 use crate::*;
 
@@ -23,14 +21,14 @@ pub struct Streams {
 }
 
 impl Streams {
-    pub fn from(buffer: &mut BufReader<File>, root_address: u64, headers: &Vec<StreamHeader>) -> Result<Streams, std::io::Error> {
+    pub fn from(buffer: &mut PeParser, root_address: u64, headers: &Vec<StreamHeader>) -> Result<Streams, std::io::Error> {
         let mut strings = None;
         let mut user_strings = None;
         let mut blobs = None;
         let mut metadata = None;
 
         for header in headers {
-            buffer.seek(std::io::SeekFrom::Start(root_address + header.offset as u64))?;
+            buffer.seek(root_address + header.offset as u64)?;
             match header.name.as_str() {
                 "#Strings" => strings = Some(StringStream::from(buffer, header)?),
                 "#US" => user_strings = Some(UserStringStream::from(buffer, header)?),
@@ -69,7 +67,7 @@ impl Streams {
 pub struct StringStream(HashMap<u32, String>);
 
 impl StringStream {
-    pub fn from(buffer: &mut BufReader<File>, header: &StreamHeader) -> Result<StringStream, std::io::Error> {
+    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<StringStream, std::io::Error> {
         let mut strings = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -103,7 +101,7 @@ impl StringStream {
 pub struct BlobStream(pub HashMap<u32, Vec<u8>>);
 
 impl BlobStream {
-    pub fn from(buffer: &mut BufReader<File>, header: &StreamHeader) -> Result<BlobStream, std::io::Error> {
+    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<BlobStream, std::io::Error> {
         let mut blobs = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -128,7 +126,7 @@ impl BlobStream {
 /// * If the first four bytes of the 'blob' are *110bbbbb<sub>2</sub>*, *x*, *y*, and *z*, then the rest of the 'blob' contains the (*bbbbb<sub>2</sub>* << 24 + *x* << 16 + *y* << 8 + *z*) bytes of actual data. 
 ///
 /// Returns the length of the 'blob' and the number of bytes read from the buffer.
-fn read_blob_length(buffer: &mut BufReader<File>) -> Result<(usize, u32), std::io::Error> {
+fn read_blob_length(buffer: &mut PeParser) -> Result<(usize, u32), std::io::Error> {
     let first = buffer.read_u8()?;
 
     if first & 0b1000_0000 == 0 {
@@ -166,7 +164,7 @@ fn read_blob_length(buffer: &mut BufReader<File>) -> Result<(usize, u32), std::i
 pub struct UserStringStream(pub HashMap<u32, Vec<u16>>);
 
 impl UserStringStream {
-    pub fn from(buffer: &mut BufReader<File>, header: &StreamHeader) -> Result<UserStringStream, std::io::Error> {
+    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<UserStringStream, std::io::Error> {
         let mut strings = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -226,7 +224,7 @@ pub struct MetadataStream {
 }
 
 impl MetadataStream {
-    pub fn from(buffer: &mut BufReader<File>) -> Result<MetadataStream, std::io::Error> {
+    pub fn from(buffer: &mut PeParser) -> Result<MetadataStream, std::io::Error> {
         buffer.read_u32()?; // Reserved
 
         let major_version = buffer.read_u8()?;
@@ -235,6 +233,8 @@ impl MetadataStream {
         assert_eq!(minor_version, 0, "Invalid minor version");
         
         let heap_sizes = HeapSizes::from(buffer.read_u8()?);
+        buffer.set_heap_sizes(heap_sizes.clone());
+
         buffer.read_u8()?; // Reserved
         let valid = buffer.read_u64()?;
         let sorted = buffer.read_u64()?;
@@ -246,8 +246,11 @@ impl MetadataStream {
         }
 
         let mut tables = HashMap::new();
-
         let table_kinds = TableKind::from_bitmask(valid);
+        for (i, kind) in table_kinds.iter().enumerate() {
+            buffer.set_row_count(*kind, rows[i]);
+        }
+
         for (i, kind) in table_kinds.iter().enumerate() {
             tables.insert(*kind, Table::read(buffer, *kind, rows[i])?);
         }
@@ -280,6 +283,7 @@ impl MetadataStream {
 /// | `0x01`         | Size of "#String" stream >= 216. |
 /// | `0x02`         | Size of "#GUID" stream >= 216. |
 /// | `0x04`         | Size of "#Blob" stream >= 216. |
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct HeapSizes(u8);
 
 impl HeapSizes {

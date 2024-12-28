@@ -1,6 +1,3 @@
-use std::{fs::File, io::BufReader};
-
-use metadata::bufreader_extension::BufReaderExtension;
 
 use crate::*;
 
@@ -61,7 +58,7 @@ pub enum Table {
 }
 
 impl Table {
-    pub fn read(buffer: &mut BufReader<File>, kind: TableKind, row_count: u32) -> Result<Table, std::io::Error> {
+    pub fn read(buffer: &mut PeParser, kind: TableKind, row_count: u32) -> Result<Table, std::io::Error> {
         match kind {
             TableKind::Assembly => Ok(Table::Assembly(read_single_row(buffer, row_count)?)),
             TableKind::AssemblyOS => unimplemented!(),
@@ -105,7 +102,7 @@ impl Table {
     }
 }
 
-fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Vec<T>, std::io::Error> {
+fn read_rows<T: TableRow>(buffer: &mut PeParser, row_count: u32) -> Result<Vec<T>, std::io::Error> {
     let mut rows = Vec::new();
     for _ in 0..row_count {
         rows.push(T::read_from(buffer)?);
@@ -113,7 +110,7 @@ fn read_rows<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Resul
     Ok(rows)
 }
 
-fn read_single_row<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) -> Result<Option<T>, std::io::Error> {
+fn read_single_row<T: TableRow>(buffer: &mut PeParser, row_count: u32) -> Result<Option<T>, std::io::Error> {
     if row_count <= 0 {
         Ok(None)
     } else {
@@ -122,7 +119,7 @@ fn read_single_row<T: TableRow>(buffer: &mut BufReader<File>, row_count: u32) ->
 }
 
 pub trait TableRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<Self, std::io::Error> where Self: Sized;
+    fn read_from(buffer: &mut PeParser) -> Result<Self, std::io::Error> where Self: Sized;
 }
 
 /// # II.22.2 Assembly : 0x20
@@ -147,7 +144,7 @@ pub struct AssemblyRow {
 }
 
 impl TableRow for AssemblyRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<AssemblyRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<AssemblyRow, std::io::Error> {
         Ok(AssemblyRow {
             hash_alg_id: buffer.read_u32()?,
             major_version: buffer.read_u16()?,
@@ -155,9 +152,9 @@ impl TableRow for AssemblyRow {
             build_number: buffer.read_u16()?,
             revision_number: buffer.read_u16()?,
             flags: AssemblyFlags::from(buffer.read_u32()? as u16),
-            public_key: BlobIndex::read(buffer)?,
-            name: StringIndex::read(buffer)?,
-            culture: StringIndex::read(buffer)?,
+            public_key: buffer.read_blob_index()?,
+            name: buffer.read_string_index()?,
+            culture: buffer.read_string_index()?,
         })
     }
 }
@@ -185,17 +182,17 @@ pub struct AssemblyRefRow {
 }
 
 impl TableRow for AssemblyRefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<AssemblyRefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<AssemblyRefRow, std::io::Error> {
         Ok(AssemblyRefRow {
             major_version: buffer.read_u16()?,
             minor_version: buffer.read_u16()?,
             build_number: buffer.read_u16()?,
             revision_number: buffer.read_u16()?,
             flags: AssemblyFlags::from(buffer.read_u32()? as u16),
-            public_key_or_token: BlobIndex::read(buffer)?,
-            name: StringIndex::read(buffer)?,
-            culture: StringIndex::read(buffer)?,
-            hash_value: BlobIndex::read(buffer)?,
+            public_key_or_token: buffer.read_blob_index()?,
+            name: buffer.read_string_index()?,
+            culture: buffer.read_string_index()?,
+            hash_value: buffer.read_blob_index()?,
         })
     }
 }
@@ -216,14 +213,11 @@ pub struct ClassLayoutRow {
 }
 
 impl TableRow for ClassLayoutRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ClassLayoutRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ClassLayoutRow, std::io::Error> {
         Ok(ClassLayoutRow {
             packing_size: buffer.read_u16()?,
             class_size: buffer.read_u32()?,
-            parent: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            }
+            parent: buffer.read_table_index(TableKind::TypeDef)?,
         })
     }
 }
@@ -247,11 +241,11 @@ pub struct ConstantRow {
 }
 
 impl TableRow for ConstantRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ConstantRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ConstantRow, std::io::Error> {
         Ok(ConstantRow {
             type_: buffer.read_u16()?,
-            parent: CodedIndex::read(buffer, CodedIndexTag::HasConstant)?,
-            value: BlobIndex::read(buffer)?,
+            parent: buffer.read_coded_index(CodedIndexTag::HasConstant)?,
+            value: buffer.read_blob_index()?,
         })
     }
 }
@@ -271,11 +265,11 @@ pub struct CustomAttributeRow {
 }
 
 impl TableRow for CustomAttributeRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<CustomAttributeRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<CustomAttributeRow, std::io::Error> {
         Ok(CustomAttributeRow {
-            parent: CodedIndex::read(buffer, CodedIndexTag::HasCustomAttribute)?,
-            type_: CodedIndex::read(buffer, CodedIndexTag::CustomAttributeType)?,
-            value: BlobIndex::read(buffer)?,
+            parent: buffer.read_coded_index(CodedIndexTag::HasCustomAttribute)?,
+            type_: buffer.read_coded_index(CodedIndexTag::CustomAttributeType)?,
+            value: buffer.read_blob_index()?,
         })
     }
 }
@@ -296,11 +290,11 @@ pub struct DeclSecurityRow {
 }
 
 impl TableRow for DeclSecurityRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<DeclSecurityRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<DeclSecurityRow, std::io::Error> {
         Ok(DeclSecurityRow {
             action: buffer.read_u16()?,
-            parent: CodedIndex::read(buffer, CodedIndexTag::HasDeclSecurity)?,
-            permission_set: BlobIndex::read(buffer)?,
+            parent: buffer.read_coded_index(CodedIndexTag::HasDeclSecurity)?,
+            permission_set: buffer.read_blob_index()?,
         })
     }
 }
@@ -320,16 +314,10 @@ pub struct EventMapRow {
 }
 
 impl TableRow for EventMapRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<EventMapRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<EventMapRow, std::io::Error> {
         Ok(EventMapRow {
-            parent: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
-            event_list: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Event,
-            },
+            parent: buffer.read_table_index(TableKind::TypeDef)?,
+            event_list: buffer.read_table_index(TableKind::Event)?,
         })
     }
 }
@@ -351,11 +339,11 @@ pub struct EventRow {
 }
 
 impl TableRow for EventRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<EventRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<EventRow, std::io::Error> {
         Ok(EventRow {
             event_flags: EventAttributes::from(buffer.read_u16()?),
-            name: StringIndex::read(buffer)?,
-            event_type: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+            name: buffer.read_string_index()?,
+            event_type: buffer.read_coded_index(CodedIndexTag::TypeDefOrRef)?,
         })
     }
 }
@@ -387,13 +375,13 @@ pub struct ExportedTypeRow {
 }
 
 impl TableRow for ExportedTypeRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ExportedTypeRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ExportedTypeRow, std::io::Error> {
         Ok(ExportedTypeRow {
             flags: TypeAttributes::from(buffer.read_u32()?),
             type_def_id: buffer.read_u32()?,
-            type_name: StringIndex::read(buffer)?,
-            type_namespace: StringIndex::read(buffer)?,
-            implementation: CodedIndex::read(buffer, CodedIndexTag::Implementation)?,
+            type_name: buffer.read_string_index()?,
+            type_namespace: buffer.read_string_index()?,
+            implementation: buffer.read_coded_index(CodedIndexTag::Implementation)?,
         })
     }
 }
@@ -418,11 +406,11 @@ pub struct FieldRow {
 }
 
 impl TableRow for FieldRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<FieldRow, std::io::Error> {
         Ok(FieldRow {
             flags: FieldAttributes::from(buffer.read_u16()?),
-            name: StringIndex::read(buffer)?,
-            signature: BlobIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
+            signature: buffer.read_blob_index()?,
         })
     }
 }
@@ -439,13 +427,10 @@ pub struct FieldLayoutRow {
 }
 
 impl TableRow for FieldLayoutRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldLayoutRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<FieldLayoutRow, std::io::Error> {
         Ok(FieldLayoutRow {
             offset: buffer.read_u32()?,
-            field: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Field,
-            }
+            field: buffer.read_table_index(TableKind::Field)?,
         })
     }
 }
@@ -464,10 +449,10 @@ pub struct FieldMarshalRow {
 }
 
 impl TableRow for FieldMarshalRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldMarshalRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<FieldMarshalRow, std::io::Error> {
         Ok(FieldMarshalRow {
-            parent: CodedIndex::read(buffer, CodedIndexTag::HasFieldMarshal)?,
-            native_type: BlobIndex::read(buffer)?,
+            parent: buffer.read_coded_index(CodedIndexTag::HasFieldMarshal)?,
+            native_type: buffer.read_blob_index()?,
         })
     }
 }
@@ -484,13 +469,10 @@ pub struct FieldRVARow {
 }
 
 impl TableRow for FieldRVARow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<FieldRVARow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<FieldRVARow, std::io::Error> {
         Ok(FieldRVARow {
             rva: buffer.read_u32()?,
-            field: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Field,
-            }
+            field: buffer.read_table_index(TableKind::Field)?,
         })
     }
     
@@ -510,11 +492,11 @@ pub struct FileRow {
 }
 
 impl TableRow for FileRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<FileRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<FileRow, std::io::Error> {
         Ok(FileRow {
             flags: FileAttributes::from(buffer.read_u32()?),
-            name: StringIndex::read(buffer)?,
-            hash_value: BlobIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
+            hash_value: buffer.read_blob_index()?,
         })
     }
     
@@ -538,12 +520,12 @@ pub struct GenericParamRow {
 }
 
 impl TableRow for GenericParamRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<GenericParamRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<GenericParamRow, std::io::Error> {
         Ok(GenericParamRow {
             number: buffer.read_u16()?,
             flags: GenericParamAttributes::from(buffer.read_u16()?),
-            owner: CodedIndex::read(buffer, CodedIndexTag::TypeOrMethodDef)?,
-            name: StringIndex::read(buffer)?,
+            owner: buffer.read_coded_index(CodedIndexTag::TypeOrMethodDef)?,
+            name: buffer.read_string_index()?,
         })
     }
 }
@@ -561,13 +543,10 @@ pub struct GenericParamConstraintRow {
 }
 
 impl TableRow for GenericParamConstraintRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<GenericParamConstraintRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<GenericParamConstraintRow, std::io::Error> {
         Ok(GenericParamConstraintRow {
-            owner: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::GenericParam,
-            },
-            constraint: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+            owner: buffer.read_table_index(TableKind::GenericParam)?,
+            constraint: buffer.read_coded_index(CodedIndexTag::TypeDefOrRef)?,
         })
     }
 }
@@ -591,15 +570,12 @@ pub struct ImplMapRow {
 }
 
 impl TableRow for ImplMapRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ImplMapRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ImplMapRow, std::io::Error> {
         Ok(ImplMapRow {
             mapping_flags: PInvokeAttributes::from(buffer.read_u16()?),
-            member_forwarded: CodedIndex::read(buffer, CodedIndexTag::MemberForwarded)?,
-            import_name: StringIndex::read(buffer)?,
-            import_scope: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::ModuleRef,
-            }
+            member_forwarded: buffer.read_coded_index(CodedIndexTag::MemberForwarded)?,
+            import_name: buffer.read_string_index()?,
+            import_scope: buffer.read_table_index(TableKind::ModuleRef)?,
         })
     }
 }
@@ -616,13 +592,10 @@ pub struct InterfaceImplRow {
 }
 
 impl TableRow for InterfaceImplRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<InterfaceImplRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<InterfaceImplRow, std::io::Error> {
         Ok(InterfaceImplRow {
-            class: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
-            interface: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
+            class: buffer.read_table_index(TableKind::TypeDef)?,
+            interface: buffer.read_coded_index(CodedIndexTag::TypeDefOrRef)?,
         })
     }
 }
@@ -643,12 +616,12 @@ pub struct ManifestResourceRow {
 }
 
 impl TableRow for ManifestResourceRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ManifestResourceRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ManifestResourceRow, std::io::Error> {
         Ok(ManifestResourceRow {
             offset: buffer.read_u32()?,
             flags: ManifestResourceAttributes::from(buffer.read_u32()?),
-            name: StringIndex::read(buffer)?,
-            implementation: CodedIndex::read(buffer, CodedIndexTag::Implementation)?,
+            name: buffer.read_string_index()?,
+            implementation: buffer.read_coded_index(CodedIndexTag::Implementation)?,
         })
     }
 }
@@ -673,11 +646,11 @@ pub struct MemberRefRow {
 }
 
 impl TableRow for MemberRefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<MemberRefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<MemberRefRow, std::io::Error> {
         Ok(MemberRefRow {
-            class: CodedIndex::read(buffer, CodedIndexTag::MemberRefParent)?,
-            name: StringIndex::read(buffer)?,
-            signature: BlobIndex::read(buffer)?,
+            class: buffer.read_coded_index(CodedIndexTag::MemberRefParent)?,
+            name: buffer.read_string_index()?,
+            signature: buffer.read_blob_index()?,
         })
     }
 }
@@ -707,17 +680,14 @@ pub struct MethodDefRow {
 }
 
 impl TableRow for MethodDefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodDefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<MethodDefRow, std::io::Error> {
         Ok(MethodDefRow {
             rva: buffer.read_u32()?,
             impl_flags: MethodImplAttributes::from(buffer.read_u16()?),
             flags: MethodAttributes::from(buffer.read_u16()?),
-            name: StringIndex::read(buffer)?,
-            signature: BlobIndex::read(buffer)?,
-            param_list: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Param,
-            },
+            name: buffer.read_string_index()?,
+            signature: buffer.read_blob_index()?,
+            param_list: buffer.read_table_index(TableKind::Param)?,
         })
     }
 }
@@ -738,14 +708,11 @@ pub struct MethodImplRow {
 }
 
 impl TableRow for MethodImplRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodImplRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<MethodImplRow, std::io::Error> {
         Ok(MethodImplRow {
-            class: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
-            method_body: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
-            method_declaration: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
+            class: buffer.read_table_index(TableKind::TypeDef)?,
+            method_body: buffer.read_coded_index(CodedIndexTag::MethodDefOrRef)?,
+            method_declaration: buffer.read_coded_index(CodedIndexTag::MethodDefOrRef)?,
         })
     }
 }
@@ -764,14 +731,11 @@ pub struct MethodSemanticsRow {
 }
 
 impl TableRow for MethodSemanticsRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodSemanticsRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<MethodSemanticsRow, std::io::Error> {
         Ok(MethodSemanticsRow {
             semantics: MethodSemanticsAttributes::from(buffer.read_u16()?),
-            method: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::MethodDef,
-            },
-            association: CodedIndex::read(buffer, CodedIndexTag::HasSemantics)?,
+            method: buffer.read_table_index(TableKind::MethodDef)?,
+            association: buffer.read_coded_index(CodedIndexTag::HasSemantics)?,
         })
     }
 }
@@ -789,10 +753,10 @@ pub struct MethodSpecRow {
 }
 
 impl TableRow for MethodSpecRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<MethodSpecRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<MethodSpecRow, std::io::Error> {
         Ok(MethodSpecRow {
-            method: CodedIndex::read(buffer, CodedIndexTag::MethodDefOrRef)?,
-            instantiation: BlobIndex::read(buffer)?,
+            method: buffer.read_coded_index(CodedIndexTag::MethodDefOrRef)?,
+            instantiation: buffer.read_blob_index()?,
         })
     }
 }
@@ -815,13 +779,13 @@ pub struct ModuleRow {
 }
 
 impl TableRow for ModuleRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ModuleRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ModuleRow, std::io::Error> {
         Ok(ModuleRow {
             generation: buffer.read_u16()?,
-            name: StringIndex::read(buffer)?,
-            mvid: GuidIndex::read(buffer)?,
-            enc_id: GuidIndex::read(buffer)?,
-            enc_base_id: GuidIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
+            mvid: buffer.read_guid_index()?,
+            enc_id: buffer.read_guid_index()?,
+            enc_base_id: buffer.read_guid_index()?,
         })
     }
 }
@@ -836,9 +800,9 @@ pub struct ModuleRefRow {
 }
 
 impl TableRow for ModuleRefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ModuleRefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ModuleRefRow, std::io::Error> {
         Ok(ModuleRefRow {
-            name: StringIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
         })
     }
 }
@@ -855,16 +819,10 @@ pub struct NestedClassRow {
 }
 
 impl TableRow for NestedClassRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<NestedClassRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<NestedClassRow, std::io::Error> {
         Ok(NestedClassRow {
-            nested_class: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
-            enclosing_class: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
+            nested_class: buffer.read_table_index(TableKind::TypeDef)?,
+            enclosing_class: buffer.read_table_index(TableKind::TypeDef)?,
         })
     }
 }
@@ -885,11 +843,11 @@ pub struct ParamRow {
 }
 
 impl TableRow for ParamRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<ParamRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<ParamRow, std::io::Error> {
         Ok(ParamRow {
             flags: ParamAttributes::from(buffer.read_u16()?),
             sequence: buffer.read_u16()?,
-            name: StringIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
         })
     }
 }
@@ -911,11 +869,11 @@ pub struct PropertyRow {
 }
 
 impl TableRow for PropertyRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<PropertyRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<PropertyRow, std::io::Error> {
         Ok(PropertyRow {
             flags: PropertyAttributes::from(buffer.read_u16()?),
-            name: StringIndex::read(buffer)?,
-            type_: BlobIndex::read(buffer)?,
+            name: buffer.read_string_index()?,
+            type_: buffer.read_blob_index()?,
         })
     }
 }
@@ -935,16 +893,10 @@ pub struct PropertyMapRow {
 }
 
 impl TableRow for PropertyMapRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<PropertyMapRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<PropertyMapRow, std::io::Error> {
         Ok(PropertyMapRow {
-            parent: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::TypeDef,
-            },
-            property_list: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Property,
-            },
+            parent: buffer.read_table_index(TableKind::TypeDef)?,
+            property_list: buffer.read_table_index(TableKind::Property)?,
         })
     }
 }
@@ -961,12 +913,11 @@ pub struct StandAloneSigRow {
 }
 
 impl TableRow for StandAloneSigRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<StandAloneSigRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<StandAloneSigRow, std::io::Error> {
         Ok(StandAloneSigRow {
-            signature: BlobIndex::read(buffer)?,
+            signature: buffer.read_blob_index()?,
         })
     }
-    
 }
 
 /// # II.22.37 TypeDef : 0x02
@@ -997,20 +948,14 @@ pub struct TypeDefRow {
 }
 
 impl TableRow for TypeDefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<TypeDefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<TypeDefRow, std::io::Error> {
         Ok(TypeDefRow {
             flags: TypeAttributes::from(buffer.read_u32()?),
-            type_name: StringIndex::read(buffer)?,
-            type_namespace: StringIndex::read(buffer)?,
-            extends: CodedIndex::read(buffer, CodedIndexTag::TypeDefOrRef)?,
-            field_list: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::Field,
-            },
-            method_list: CodedIndex {
-                index: buffer.read_u16()? as u32,
-                table: TableKind::MethodDef,
-            },
+            type_name: buffer.read_string_index()?,
+            type_namespace: buffer.read_string_index()?,
+            extends: buffer.read_coded_index(CodedIndexTag::TypeDefOrRef)?,
+            field_list: buffer.read_table_index(TableKind::Field)?,
+            method_list: buffer.read_table_index(TableKind::MethodDef)?,
         })
     }
 }
@@ -1030,11 +975,11 @@ pub struct TypeRefRow {
 }
 
 impl TableRow for TypeRefRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<TypeRefRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<TypeRefRow, std::io::Error> {
         Ok(TypeRefRow {
-            resolution_scope: CodedIndex::read(buffer, CodedIndexTag::ResolutionScope)?,
-            type_name: StringIndex::read(buffer)?,
-            type_namespace: StringIndex::read(buffer)?,
+            resolution_scope: buffer.read_coded_index(CodedIndexTag::ResolutionScope)?,
+            type_name: buffer.read_string_index()?,
+            type_namespace: buffer.read_string_index()?,
         })
     }
 }
@@ -1051,9 +996,9 @@ pub struct TypeSpecRow {
 }
 
 impl TableRow for TypeSpecRow {
-    fn read_from(buffer: &mut BufReader<File>) -> Result<TypeSpecRow, std::io::Error> {
+    fn read_from(buffer: &mut PeParser) -> Result<TypeSpecRow, std::io::Error> {
         Ok(TypeSpecRow {
-            signature: BlobIndex::read(buffer)?,
+            signature: buffer.read_blob_index()?,
         })
     }
 }
