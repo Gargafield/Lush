@@ -47,6 +47,7 @@ impl From<u16> for BlobIndex {
 }
 
 /// # II.24.2.6 #~ stream 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum CodedIndexTag {
     /// | TypeDefOrRef: 2 bits to encode tag | Tag |
     /// | ---------------------------------- | --- |
@@ -294,9 +295,13 @@ impl CodedIndexTag {
         }
     }
 
-    /// If  e is a coded index that points into table ti out of n possible tables t0, …tn-1, then it 
-    /// is stored as e << (log n) | tag{ t0, …tn-1}[ ti] using 2 bytes if the maximum number 
-    /// of rows of tables t0, …tn-1, is less than 2<sup>(16 – (log n))</sup>, and using 4 bytes otherwise
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If *e* is a *coded index* that points into table *t<sub>i</sub>* out of *n* possible tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, then it 
+    ///   is stored as e << (log n) | tag{*t<sub>0</sub>*, ...*t<sub>n-1</sub>*}\[*t<sub>i</sub>*] using 2 bytes if the maximum number 
+    ///   of rows of tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, is less than 2<sup>(16 – (log n))</sup>, and using 4 bytes otherwise.
     pub fn is_big_index(&self, row_count: impl Fn(TableKind) -> u32) -> bool {
         match self {
             CodedIndexTag::TypeDefOrRef => {

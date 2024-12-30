@@ -9,6 +9,7 @@ pub struct PeParser {
     buffer : BufReader<File>,
     row_count: HashMap<TableKind, u32>,
     heap_sizes: HeapSizes,
+    coded_index_sizes: HashMap<CodedIndexTag, u8>,
 }
 
 // II.25.2.1 MS-DOS header
@@ -45,6 +46,7 @@ impl PeParser {
             buffer,
             row_count: HashMap::new(),
             heap_sizes: HeapSizes::from(0u8),
+            coded_index_sizes: HashMap::new(),
         }
     }
 
@@ -253,9 +255,32 @@ impl PeParser {
     /// [...]
     /// 
     /// * If e is a simple index into a table with index i, it is stored using 2 bytes if table i has less than 2<sup>16</sup> rows, otherwise it is stored using 4 bytes. 
-    pub fn read_table_index(&mut self, kind: TableKind) -> Result<CodedIndex, std::io::Error> {
+    pub fn get_table_index_size(&self, kind: TableKind) -> u8 {
         let row_count = self.row_count.get(&kind).unwrap_or(&0);
         if *row_count < 0x10000 {
+            return 2;
+        }
+        else {
+            return 4;
+        }
+    }
+
+    pub fn get_coded_index_size(&mut self, tag: CodedIndexTag) -> u8 {
+        let mut size = self.coded_index_sizes.get(&tag);
+        if size.is_none() {
+            if tag.is_big_index(|kind| *self.row_count.get(&kind).unwrap_or(&0)) {
+                size = Some(&4);
+            } else {
+                size = Some(&2);
+            };
+            self.coded_index_sizes.insert(tag, *size.unwrap());
+        }
+        return *size.unwrap();
+    }
+
+
+    pub fn read_table_index(&mut self, kind: TableKind) -> Result<CodedIndex, std::io::Error> {
+        if self.get_table_index_size(kind) == 2 {
             return Ok(CodedIndex::from(kind, self.read_u16()? as u32));
         }
         else {
@@ -277,7 +302,7 @@ impl PeParser {
     ///   *Param*, 2 => *Property*. The remaining bits hold the actual row number being 
     ///   indexed. For example, a value of `0x321`, indexes row number `0xC8` in the *Param* table.]
     pub fn read_coded_index(&mut self, tag: CodedIndexTag) -> Result<CodedIndex, std::io::Error> {
-        let index: u32 = if tag.is_big_index(|kind| *self.row_count.get(&kind).unwrap_or(&0)) {
+        let index: u32 = if self.get_coded_index_size(tag) == 4 {
             self.read_u32()?
         } else {
             self.read_u16()? as u32
