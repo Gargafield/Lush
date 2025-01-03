@@ -72,9 +72,10 @@ impl StringStream {
         let mut count = 0;
         while count < header.size {
             let mut string = Vec::new();
-            count += buffer.read_until(0, &mut string)? as u32;
+            let read = buffer.read_until(0, &mut string)? as u32;
             let string = String::from_utf8(string).unwrap();
             strings.insert(count, string);
+            count += read;
         }
         Ok(StringStream(strings))
     }
