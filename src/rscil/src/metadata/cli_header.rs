@@ -1,4 +1,4 @@
-use super::data_directories::DataDirectory;
+use super::{data_directories::DataDirectory, MetadataToken};
 
 /// # II.25.3.3 CLI header 
 ///
@@ -25,7 +25,7 @@ pub struct CliHeader {
     pub minor_runtime_version: u16,
     pub meta_data: DataDirectory,
     pub flags: RuntimeFlags,
-    pub entry_point_token: u32,
+    pub entry_point_token: MetadataToken,
     pub resources: DataDirectory,
     pub strong_name_signature: DataDirectory,
     pub code_manager_table: DataDirectory,
@@ -42,7 +42,7 @@ impl CliHeader {
             minor_runtime_version: u16::from_le_bytes(slice[6..8].try_into().unwrap()),
             meta_data: DataDirectory::from_slice(&slice[8..16]),
             flags: RuntimeFlags::new(u32::from_le_bytes(slice[16..20].try_into().unwrap())),
-            entry_point_token: u32::from_le_bytes(slice[20..24].try_into().unwrap()),
+            entry_point_token: MetadataToken::from_raw(u32::from_le_bytes(slice[20..24].try_into().unwrap())),
             resources: DataDirectory::from_slice(&slice[24..32]),
             strong_name_signature: DataDirectory::from_slice(&slice[32..40]),
             code_manager_table: DataDirectory::from_slice(&slice[40..48]),

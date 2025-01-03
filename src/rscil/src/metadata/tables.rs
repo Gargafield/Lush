@@ -5,7 +5,7 @@ use crate::*;
 macro_rules! cast_table {
     ($table:ident, $expr:expr) => {
         match $expr {
-            Some(Table::$table(x)) => *x,
+            Table::$table(x) => x,
             _ => panic!("Failed to cast table to {}", stringify!($table))
         }
     };

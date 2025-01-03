@@ -21,6 +21,7 @@ use super::characteristics::SectionCharacteristics;
 /// | 32     | 2    | NumberOfRelocations   | Should be 0 (§II.24.1). |
 /// | 34     | 2    | NumberOfLinenumbers   | Should be 0 (§II.24.1). |
 /// | 36     | 4    | Characteristics       | Flags describing section's characteristics; see below. |
+#[derive(Debug, Clone)]
 pub struct SectionHeader {
     pub name: [u8; 8],
     pub virtual_size: u32,

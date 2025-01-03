@@ -128,13 +128,13 @@ impl TableKind {
         let mut kinds = Vec::new();
         for i in 0..64 {
             if (bitmask & (1 << i)) != 0 {
-                kinds.push(TableKind::into(i).unwrap());
+                kinds.push(TableKind::from_u32(i).unwrap());
             }
         }
         kinds
     }
 
-    fn into(index: usize) -> Option<TableKind> {
+    pub fn from_u32(index: u32) -> Option<TableKind> {
         match index {
             0x20 => Some(TableKind::Assembly),
             0x22 => Some(TableKind::AssemblyOS),
@@ -178,7 +178,7 @@ impl TableKind {
         }
     }
 
-    pub fn as_index(&self) -> usize {
+    pub fn to_u32(&self) -> u32 {
         match self {
             TableKind::Assembly => 0x20,
             TableKind::AssemblyOS => 0x22,

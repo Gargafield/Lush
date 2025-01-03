@@ -10,6 +10,7 @@ pub struct PeParser {
     row_count: HashMap<TableKind, u32>,
     heap_sizes: HeapSizes,
     coded_index_sizes: HashMap<CodedIndexTag, u8>,
+    sections: Vec<SectionHeader>,
 }
 
 // II.25.2.1 MS-DOS header
@@ -47,6 +48,7 @@ impl PeParser {
             row_count: HashMap::new(),
             heap_sizes: HeapSizes::from(0u8),
             coded_index_sizes: HashMap::new(),
+            sections: vec![]
         }
     }
 
@@ -56,7 +58,7 @@ impl PeParser {
         Ok(PeParser::new(filename, buffer))
     }
 
-    pub fn read(&mut self) -> Result<PeImage, std::io::Error> {
+    pub fn read(mut self) -> Result<PeImage, std::io::Error> {
         self.buffer.seek(SeekFrom::Start(0))?;
 
         self.read_dos_stub()?;
@@ -67,22 +69,21 @@ impl PeParser {
 
         let optional_header = self.read_pe_optional_header(&header)?;
         let sections = self.read_section_header(&header)?;
-        let cli_header = self.read_cli_header(&optional_header, &sections)?;
-        let metadata_header = self.read_metadata_header(&cli_header, &sections)?;
+        self.sections.extend(sections);
+        let cli_header = self.read_cli_header(&optional_header)?;
+        let metadata_header = self.read_metadata_header(&cli_header)?;
         let streams = self.read_streams(
-            Self::get_address(&sections, cli_header.meta_data.rva),
+            self.get_address(cli_header.meta_data.rva),
             &metadata_header.stream_headers
         )?;
 
-        Ok(PeImage {
-            filename: self.filename.clone(),
-            pe_header: header,
-            optional_header,
-            sections,
+        Ok(PeImage::new(
+            self.filename.clone(),
             cli_header,
             metadata_header,
             streams,
-        })
+            self,
+        ))
     }
 
     /// # II.25.2.1 MS-DOS header
@@ -137,8 +138,8 @@ impl PeParser {
 
     /// # II.25.3.3 CLI header 
     /// See [`CliHeader`] struct for more information.
-    fn read_cli_header(&mut self, optional_header: &PeOptionalHeader, sections: &Vec<SectionHeader>) -> Result<CliHeader, std::io::Error> {
-        self.seek_rva(sections, optional_header.data_directories.cli_header.rva);
+    fn read_cli_header(&mut self, optional_header: &PeOptionalHeader) -> Result<CliHeader, std::io::Error> {
+        self.seek_rva(optional_header.data_directories.cli_header.rva);
         let mut buffer = [0u8; 72];
         self.buffer.read_exact(&mut buffer)?;
         Ok(CliHeader::from(&buffer))
@@ -146,8 +147,8 @@ impl PeParser {
 
     /// ## II.24.2.1 Metadata root
     /// See [`MetadataHeader`] struct for more information.
-    fn read_metadata_header(&mut self, cli_header: &CliHeader, sections: &Vec<SectionHeader>) -> Result<MetadataHeader, std::io::Error> {
-        self.seek_rva(sections, cli_header.meta_data.rva);
+    fn read_metadata_header(&mut self, cli_header: &CliHeader) -> Result<MetadataHeader, std::io::Error> {
+        self.seek_rva(cli_header.meta_data.rva);
         MetadataHeader::from(self)
     }
 
@@ -155,6 +156,61 @@ impl PeParser {
     /// See [`Streams`] struct for more information.
     fn read_streams(&mut self, root_address: u64, headers: &Vec<StreamHeader>) -> Result<streams::Streams, std::io::Error> {
         Streams::from(self, root_address, headers)
+    }
+
+    /// # II.25.4 Common Intermediate Language physical layout
+    /// See [`MethodBody`]
+    pub fn read_method_body(&mut self, rva: u32) -> Result<MethodBody, std::io::Error> {
+        let mut body = self.read_method_header(rva)?;
+
+        let start = self.get_position();
+        let end = start + body.code_size as u64;
+        while self.get_position() < end {
+            body.body.push(Instruction {
+                offset: (self.get_position() - start) as u32,
+                opcode: OpCode::parse(self.read_code()?, self)?,
+            });
+        }
+
+        Ok(body)
+    }
+
+    /// # II.25.4 Common Intermediate Language physical layout
+    /// See [`MethodBody`]
+    fn read_method_header(&mut self, rva: u32) -> Result<MethodBody, std::io::Error> {
+        let position = self.seek_rva(rva);
+        let header = MethodHeaderType::from(self.read_u8()?);
+        if header.is_tiny_format() {
+            Ok(MethodBody::tiny(header.0))
+        }
+        else if header.is_fat_format() {
+            self.seek(position)?;
+            let mut bytes = [0u8; 12];
+            self.read_exact(&mut bytes)?;
+            Ok(MethodBody::fat(&bytes))
+        }
+        else {
+            panic!("Invalid method header type");
+        }
+    }
+
+    pub fn get_position(&mut self) -> u64 {
+        self.buffer.seek(SeekFrom::Current(0)).unwrap()
+    }
+
+    pub fn seek_position(&mut self, position: u64) {
+        self.buffer.seek(SeekFrom::Start(position)).unwrap();
+    }
+
+    fn read_code(&mut self) -> Result<Code, std::io::Error> {
+        let mut op1 = self.read_u8()?;
+        let mut op2 = 0xff;
+        if op1 == 0xfe {
+            op2 = op1;
+            op1 = self.read_u8()?;
+        }
+
+        Ok(Code::from(&[op1, op2]))
     }
 
     /// II.25 File format extensions to PE 
@@ -167,12 +223,12 @@ impl PeParser {
     /// position within the file on disk. To compute the file position of an item with RVA r, search all the 
     /// sections in the PE file to find the section with RVA s, length l and file position p in which the RVA 
     /// lies, ie s  r < s+l. The file position of the item is then given by p+(r-s). 
-    fn seek_rva(&mut self, sections: &Vec<SectionHeader>, rva: u32) {
-        self.buffer.seek(SeekFrom::Start(Self::get_address(sections, rva))).unwrap();
+    fn seek_rva(&mut self, rva: u32) -> u64 {
+        self.buffer.seek(SeekFrom::Start(self.get_address(rva))).unwrap()
     }
 
-    fn get_address(sections: &Vec<SectionHeader>, rva: u32) -> u64 {
-        for section in sections {
+    fn get_address(&self, rva: u32) -> u64 {
+        for section in self.sections.iter() {
             if rva >= section.virtual_address && rva < section.virtual_address + section.virtual_size {
                 return section.pointer_to_raw_data as u64 + (rva - section.virtual_address) as u64;
             }
@@ -184,10 +240,34 @@ impl PeParser {
         self.buffer.seek(SeekFrom::Start(position))
     }
 
+    pub fn read_f64(&mut self) -> Result<f64, std::io::Error> {
+        let mut buffer = [0u8; 8];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(f64::from_le_bytes(buffer))
+    }
+
+    pub fn read_i64(&mut self) -> Result<i64, std::io::Error> {
+        let mut buffer = [0u8; 8];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(i64::from_le_bytes(buffer))
+    }
+
     pub fn read_u64(&mut self) -> Result<u64, std::io::Error> {
         let mut buffer = [0u8; 8];
         self.buffer.read_exact(&mut buffer)?;
         Ok(u64::from_le_bytes(buffer))
+    }
+
+    pub fn read_f32(&mut self) -> Result<f32, std::io::Error> {
+        let mut buffer = [0u8; 4];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(f32::from_le_bytes(buffer))
+    }
+
+    pub fn read_i32(&mut self) -> Result<i32, std::io::Error> {
+        let mut buffer = [0u8; 4];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(i32::from_le_bytes(buffer))
     }
 
     pub fn read_u32(&mut self) -> Result<u32, std::io::Error> {
@@ -202,10 +282,32 @@ impl PeParser {
         Ok(u16::from_le_bytes(buffer))
     }
 
+    pub fn read_i8(&mut self) -> Result<i8, std::io::Error> {
+        let mut buffer = [0u8; 1];
+        self.buffer.read_exact(&mut buffer)?;
+        Ok(i8::from_le_bytes(buffer))
+    }
+
     pub fn read_u8(&mut self) -> Result<u8, std::io::Error> {
         let mut buffer = [0u8; 1];
         self.buffer.read_exact(&mut buffer)?;
         Ok(u8::from_le_bytes(buffer))
+    }
+
+    /// # III.3.66 switch – table switch based on value 
+    /// 
+    /// [...]
+    /// 
+    /// The format of the instruction is an unsigned int32 representing the number of targets N,
+    /// followed by N int32 values specifying jump targets:
+    /// these targets are represented as offsets (positive or negative) from the beginning of the instruction following this switch instruction.
+    pub fn read_switch_table(&mut self) -> Result<Vec<i32>, std::io::Error> {
+        let count = self.read_u32()? as usize;
+        let mut table = Vec::with_capacity(count);
+        for _ in 0..count {
+            table.push(self.read_i32()?);
+        }
+        Ok(table)
     }
 
     /// # II.24.2.6 #~ stream 
@@ -311,6 +413,11 @@ impl PeParser {
         let data = index >> tag.get_tag_size();
         let table = tag.get_table_kind((index & 0xff) as u8);
         Ok(CodedIndex::from(table, data))
+    }
+
+    pub fn read_metadata_token(&mut self) -> Result<MetadataToken, std::io::Error> {
+        let token = self.read_u32()?;
+        Ok(MetadataToken::from_raw(token))
     }
 
     pub fn read_exact(&mut self, buffer: &mut [u8]) -> Result<(), std::io::Error> {

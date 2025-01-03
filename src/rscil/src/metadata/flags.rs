@@ -538,3 +538,59 @@ impl TypeAttributes {
         self.0 & flag == flag
     }
 }
+
+/// # II.25.4.1 Method header type values 
+///
+/// The two least significant bits of the first byte of the method header indicate what type of header is 
+/// present. These 2 bits will be one and only one of the following:
+/// 
+/// | Value                    | Value | Description | 
+/// | ------------------------ | ----- | ----------- |
+/// | `CorILMethod_TinyFormat` | `0x2` | The method header is tiny (§II.25.4.2). | 
+/// | `CorILMethod_FatFormat`  | `0x3` | The method header is fat (§II.25.4.3). |
+/// 
+/// # II.25.4.4 Flags for method headers 
+/// 
+/// The first byte of a method header can also contain the following flags, valid only for the Fat format, 
+/// that indicate how the method is to be executed:
+/// 
+/// | Flag                     | Value  | Description |
+/// | ------------------------ | ------ | ----------- |
+/// | [...]                    | [...]  | [...] |
+/// | `CorILMethod_MoreSects`  | `0x8`  | More sections follow after this header (§II.25.4.5). |
+/// | `CorILMethod_InitLocals` | `0x10` | Call default constructor on all local variables. |
+/// 
+pub struct MethodHeaderType(pub u8);
+
+impl From<u8> for MethodHeaderType {
+    fn from(value: u8) -> Self {
+        MethodHeaderType(value)
+    }
+}
+
+impl MethodHeaderType {
+    const COR_IL_METHOD_TINY_FORMAT: u8 = 0x2;
+    const COR_IL_METHOD_FAT_FORMAT: u8 = 0x3;
+    const COR_IL_METHOD_MORE_SECTS: u8 = 0x8;
+    const COR_IL_METHOD_INIT_LOCALS: u8 = 0x10;
+
+    pub fn is_tiny_format(&self) -> bool {
+        self.check_flag(Self::COR_IL_METHOD_TINY_FORMAT)
+    }
+
+    pub fn is_fat_format(&self) -> bool {
+        self.check_flag(Self::COR_IL_METHOD_FAT_FORMAT)
+    }
+
+    pub fn has_more_sects(&self) -> bool {
+        self.is_fat_format() && self.check_flag(Self::COR_IL_METHOD_MORE_SECTS)
+    }
+
+    pub fn init_locals(&self) -> bool {
+        self.is_fat_format() && self.check_flag(Self::COR_IL_METHOD_INIT_LOCALS)
+    }
+
+    pub fn check_flag(&self, flag: u8) -> bool {
+        self.0 & flag == flag
+    }
+}

@@ -267,8 +267,8 @@ impl MetadataStream {
         })
     }
 
-    pub fn get_table(&self, kind: TableKind) -> Option<&Table> {
-        self.tables.get(&kind)
+    pub fn get_table(&self, kind: TableKind) -> &Table {
+        self.tables.get(&kind).unwrap()
     }
 }
 

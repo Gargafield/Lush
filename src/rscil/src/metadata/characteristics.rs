@@ -55,6 +55,7 @@ impl FileCharacteristics {
 /// | `IMAGE_SCN_MEM_EXECUTE`            | `0x20000000` | Section can be executed as code. |
 /// | `IMAGE_SCN_MEM_READ`               | `0x40000000` | Section can be read. |
 /// | `IMAGE_SCN_MEM_WRITE`              | `0x80000000` | Section can be written to.|
+#[derive(Debug, Clone)]
 pub struct SectionCharacteristics(u32);
 
 impl SectionCharacteristics {

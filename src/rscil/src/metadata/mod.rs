@@ -14,6 +14,7 @@ mod kind;
 mod tables;
 mod index;
 mod flags;
+mod cil;
 
 use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
 
@@ -30,3 +31,4 @@ pub use parser::PeParser;
 pub use tables::*;
 pub use index::*;
 pub use flags::*;
+pub use cil::*;

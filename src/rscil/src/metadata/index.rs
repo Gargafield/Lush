@@ -424,3 +424,29 @@ impl CodedIndex {
         }
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MetadataToken {
+    UserString(u32),
+    Table(TableKind, u32),
+}
+
+impl MetadataToken {
+    pub fn from_raw(raw: u32) -> Self {
+        let table = raw >> 24;
+        let index = raw & 0x00FFFFFF;
+
+        match table {
+            0x70 => MetadataToken::UserString(index),
+            _ => MetadataToken::Table(TableKind::from_u32(table).unwrap(), index),
+        }
+    }
+
+    pub fn to_raw(&self) -> u32 {
+        match self {
+            MetadataToken::UserString(index) => 0x70 << 24 | index,
+            MetadataToken::Table(table, index) => table.to_u32() << 24 | index,
+        }
+    }
+}
+
