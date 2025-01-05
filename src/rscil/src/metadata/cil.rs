@@ -156,6 +156,22 @@ pub enum FlowControl {
     Meta
 }
 
+/// # III.3.66 switch – table switch based on value 
+/// 
+/// [...]
+/// 
+/// The format of the instruction is an unsigned int32 representing the number of targets N,
+/// followed by N int32 values specifying jump targets:
+/// these targets are represented as offsets (positive or negative) from the beginning of the instruction following this switch instruction.
+fn read_switch_table(buffer: &mut Buffer) -> Result<Vec<i32>, std::io::Error> {
+    let count = buffer.read_u32::<LittleEndian>()? as usize;
+    let mut table = Vec::with_capacity(count);
+    for _ in 0..count {
+        table.push(buffer.read_i32::<LittleEndian>()?);
+    }
+    Ok(table)
+}
+
 macro_rules! opcodes {
     ($(OPDEF($name:ident, $instr:tt, $pop:ident, $push:ident, $operand:ident, $_type:ident, $size:tt, $op1:tt, $op2:tt, $flow:ident))*) => {
         paste! {
@@ -209,10 +225,10 @@ macro_rules! opcodes {
                     }
                 }
 
-                pub fn parse(code: Code, reader: &mut PeParser) -> Result<OpCode, std::io::Error> {
+                pub fn parse(code: Code, buffer: &mut Buffer) -> Result<OpCode, std::io::Error> {
                     match code {
                         $(
-                            Code::$name => Ok(OpCode::$name( opcodes!(@parse reader $operand) )),
+                            Code::$name => Ok(OpCode::$name( opcodes!(@parse $operand buffer) )),
                         )*
                     }
                 }
@@ -226,71 +242,71 @@ macro_rules! opcodes {
     //
     // a. InlineBrTarget – Branch target, represented as a 4-byte signed integer from the beginning of the instruction following the current instruction. 
     (@ty InlineBrTarget) => { i32 };
-    (@parse $reader:ident InlineBrTarget) => {$reader.read_i32()? };
+    (@parse InlineBrTarget $buffer:ident) => { $buffer.read_i32::<LittleEndian>()? };
 
     // b. InlineField – Metadata token (4 bytes) representing a FieldRef (i.e., a MemberRef to a field) or FieldDef 
     (@ty InlineField) => { MetadataToken };
-    (@parse $reader:ident InlineField) => {$reader.read_metadata_token()? };
+    (@parse InlineField $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // c. InlineI – 4-byte integer 
     (@ty InlineI) => { i32 };
-    (@parse $reader:ident InlineI) => {$reader.read_i32()? };
+    (@parse InlineI $buffer:ident) => { $buffer.read_i32::<LittleEndian>()? };
 
     // d. InlineI8 – 8-byte integer 
     (@ty InlineI8) => { i64 };
-    (@parse $reader:ident InlineI8) => {$reader.read_i64()? };
+    (@parse InlineI8 $buffer:ident) => { $buffer.read_i64::<LittleEndian>()? };
 
     // e. InlineMethod – Metadata token (4 bytes) representing a MethodRef (i.e., a MemberRef to a method) or MethodDef 
     (@ty InlineMethod) => { MetadataToken };
-    (@parse $reader:ident InlineMethod) => {$reader.read_metadata_token()? };
+    (@parse InlineMethod $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // f. InlineNone – No in-line argument 
     (@ty InlineNone) => { () };
-    (@parse $reader:ident InlineNone) => { () };
+    (@parse InlineNone $buffer:ident) => { () };
     
     // g. InlineR – 8-byte floating point number 
     (@ty InlineR) => { f64 };
-    (@parse $reader:ident InlineR) => {$reader.read_f64()? };
+    (@parse InlineR $buffer:ident) => { $buffer.read_f64::<LittleEndian>()? };
 
     // h. InlineSig – Metadata token (4 bytes) representing a standalone signature 
     (@ty InlineSig) => { MetadataToken };
-    (@parse $reader:ident InlineSig) => {$reader.read_metadata_token()? };
+    (@parse InlineSig $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // i. InlineString – Metadata token (4 bytes) representing a UserString 
     (@ty InlineString) => { MetadataToken };
-    (@parse $reader:ident InlineString) => {$reader.read_metadata_token()? };
+    (@parse InlineString $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // j. InlineSwitch – Special for the switch instructions, see [`PeParser::read_switch_table`] for details
     (@ty InlineSwitch) => { Vec<i32> };
-    (@parse $reader:ident InlineSwitch) => {$reader.read_switch_table()? };
+    (@parse InlineSwitch $buffer:ident) => { read_switch_table($buffer)? };
 
     // k. InlineTok – Arbitrary metadata token (4 bytes) , used for ldtoken instruction, see Partition III for details 
     (@ty InlineTok) => { MetadataToken };
-    (@parse $reader:ident InlineTok) => {$reader.read_metadata_token()? };
+    (@parse InlineTok $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // l. InlineType – Metadata token (4 bytes) representing a TypeDef, TypeRef, or TypeSpec
     (@ty InlineType) => { MetadataToken };
-    (@parse $reader:ident InlineType) => {$reader.read_metadata_token()? };
+    (@parse InlineType $buffer:ident) => { MetadataToken::read($buffer)? };
 
     // m. InlineVar – 2-byte integer representing an argument or local variable
     (@ty InlineVar) => { u16 };
-    (@parse $reader:ident InlineVar) => {$reader.read_u16()? };
+    (@parse InlineVar $buffer:ident) => { $buffer.read_u16::<LittleEndian>()? };
 
     // n. ShortInlineBrTarget – Short branch target, represented as 1 signed byte from the beginning of the instruction following the current instruction.
     (@ty ShortInlineBrTarget) => { i8 }; 
-    (@parse $reader:ident ShortInlineBrTarget) => {$reader.read_i8()? };
+    (@parse ShortInlineBrTarget $buffer:ident) => { $buffer.read_i8()? };
 
     // o. ShortInlineI – 1-byte integer, signed or unsigned depending on instruction 
     (@ty ShortInlineI) => { i8 };
-    (@parse $reader:ident ShortInlineI) => {$reader.read_i8()? };
+    (@parse ShortInlineI $buffer:ident) => { $buffer.read_i8()? };
 
     // p. ShortInlineR – 4-byte floating point number 
     (@ty ShortInlineR) => { f32 };
-    (@parse $reader:ident ShortInlineR) => {$reader.read_f32()? };
+    (@parse ShortInlineR $buffer:ident) => { $buffer.read_f32::<LittleEndian>()? };
     
     // q. ShortInlineVar – 1-byte integer representing an argument or local variable 
     (@ty ShortInlineVar) => { u8 };
-    (@parse $reader:ident ShortInlineVar) => {$reader.read_u8()? };
+    (@parse ShortInlineVar $buffer:ident) => { $buffer.read_u8()? };
 }
 
 opcodes!(

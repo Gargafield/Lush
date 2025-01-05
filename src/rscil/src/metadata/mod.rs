@@ -15,8 +15,10 @@ mod tables;
 mod index;
 mod flags;
 mod cil;
+mod decode_context;
 
-use std::{fs::File, io::{BufReader, Read, Seek, SeekFrom}};
+use std::{fs::File, io::{Cursor, Read, Seek, SeekFrom}};
+use byteorder::{LittleEndian, ReadBytesExt};
 
 pub use characteristics::{FileCharacteristics, SectionCharacteristics};
 pub use kind::TableKind;
@@ -25,10 +27,13 @@ pub use metadata_header::{MetadataHeader, StreamHeader};
 pub use pe_header::PeHeader;
 pub use pe_optional_header::PeOptionalHeader;
 pub use section_header::SectionHeader;
-pub use streams::Streams;
+pub use streams::{Streams, HeapSizes};
 pub use image::PeImage;
 pub use parser::PeParser;
 pub use tables::*;
 pub use index::*;
 pub use flags::*;
 pub use cil::*;
+pub(crate) use decode_context::TableDecodeContext;
+
+pub(crate) type Buffer = Cursor<Vec<u8>>;

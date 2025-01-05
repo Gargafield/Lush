@@ -1,6 +1,6 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, io::BufRead};
 
-use crate::*;
+use super::*;
 
 /// II.24.2.2 Stream header 
 /// 
@@ -21,14 +21,14 @@ pub struct Streams {
 }
 
 impl Streams {
-    pub fn from(buffer: &mut PeParser, root_address: u64, headers: &Vec<StreamHeader>) -> Result<Streams, std::io::Error> {
+    pub fn from(buffer: &mut Buffer, root_address: u64, headers: &Vec<StreamHeader>) -> Result<Streams, std::io::Error> {
         let mut strings = None;
         let mut user_strings = None;
         let mut blobs = None;
         let mut metadata = None;
 
         for header in headers {
-            buffer.seek(root_address + header.offset as u64)?;
+            buffer.set_position(root_address + header.offset as u64);
             match header.name.as_str() {
                 "#Strings" => strings = Some(StringStream::from(buffer, header)?),
                 "#US" => user_strings = Some(UserStringStream::from(buffer, header)?),
@@ -67,7 +67,7 @@ impl Streams {
 pub struct StringStream(HashMap<u32, String>);
 
 impl StringStream {
-    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<StringStream, std::io::Error> {
+    pub fn from(buffer: &mut Buffer, header: &StreamHeader) -> Result<StringStream, std::io::Error> {
         let mut strings = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -102,7 +102,7 @@ impl StringStream {
 pub struct BlobStream(pub HashMap<u32, Vec<u8>>);
 
 impl BlobStream {
-    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<BlobStream, std::io::Error> {
+    pub fn from(buffer: &mut Buffer, header: &StreamHeader) -> Result<BlobStream, std::io::Error> {
         let mut blobs = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -127,7 +127,7 @@ impl BlobStream {
 /// * If the first four bytes of the 'blob' are *110bbbbb<sub>2</sub>*, *x*, *y*, and *z*, then the rest of the 'blob' contains the (*bbbbb<sub>2</sub>* << 24 + *x* << 16 + *y* << 8 + *z*) bytes of actual data. 
 ///
 /// Returns the length of the 'blob' and the number of bytes read from the buffer.
-fn read_blob_length(buffer: &mut PeParser) -> Result<(usize, u32), std::io::Error> {
+fn read_blob_length(buffer: &mut Buffer) -> Result<(usize, u32), std::io::Error> {
     let first = buffer.read_u8()?;
 
     if first & 0b1000_0000 == 0 {
@@ -165,7 +165,7 @@ fn read_blob_length(buffer: &mut PeParser) -> Result<(usize, u32), std::io::Erro
 pub struct UserStringStream(pub HashMap<u32, Vec<u16>>);
 
 impl UserStringStream {
-    pub fn from(buffer: &mut PeParser, header: &StreamHeader) -> Result<UserStringStream, std::io::Error> {
+    pub fn from(buffer: &mut Buffer, header: &StreamHeader) -> Result<UserStringStream, std::io::Error> {
         let mut strings = HashMap::new();
         let mut count = 0;
         while count < header.size {
@@ -174,7 +174,7 @@ impl UserStringStream {
             // Read UTF-16 string
             let mut string = vec![0u16; length / 2];
             for i in 0..(length / 2) {
-                string[i] = buffer.read_u16()?;
+                string[i] = buffer.read_u16::<LittleEndian>()?;
             }
 
             strings.insert(count, string);
@@ -225,8 +225,8 @@ pub struct MetadataStream {
 }
 
 impl MetadataStream {
-    pub fn from(buffer: &mut PeParser) -> Result<MetadataStream, std::io::Error> {
-        buffer.read_u32()?; // Reserved
+    pub fn from(buffer: &mut Buffer) -> Result<MetadataStream, std::io::Error> {
+        buffer.read_u32::<LittleEndian>()?; // Reserved
 
         let major_version = buffer.read_u8()?;
         let minor_version = buffer.read_u8()?;
@@ -234,26 +234,28 @@ impl MetadataStream {
         assert_eq!(minor_version, 0, "Invalid minor version");
         
         let heap_sizes = HeapSizes::from(buffer.read_u8()?);
-        buffer.set_heap_sizes(heap_sizes.clone());
 
         buffer.read_u8()?; // Reserved
-        let valid = buffer.read_u64()?;
-        let sorted = buffer.read_u64()?;
+        let valid = buffer.read_u64::<LittleEndian>()?;
+        let sorted = buffer.read_u64::<LittleEndian>()?;
 
+        let mut row_count = HashMap::new();
         let mut rows = Vec::new();
+
         let number_of_tables = valid.count_ones();
-        for _ in 0..number_of_tables {
-            rows.push(buffer.read_u32()?);
+        let table_kinds = TableKind::from_bitmask(valid);
+
+        for i in 0..number_of_tables {
+            let count = buffer.read_u32::<LittleEndian>()?;
+            rows.push(count);
+            row_count.insert(table_kinds[i as usize], count);
         }
 
         let mut tables = HashMap::new();
-        let table_kinds = TableKind::from_bitmask(valid);
-        for (i, kind) in table_kinds.iter().enumerate() {
-            buffer.set_row_count(*kind, rows[i]);
-        }
+        let context = TableDecodeContext::new(row_count, heap_sizes);
 
-        for (i, kind) in table_kinds.iter().enumerate() {
-            tables.insert(*kind, Table::read(buffer, *kind, rows[i])?);
+        for kind in table_kinds.iter() {
+            tables.insert(*kind, Table::read(buffer, *kind, &context)?);
         }
 
         Ok(MetadataStream {
@@ -296,7 +298,7 @@ impl HeapSizes {
         HeapSizes(value)
     }
 
-    pub fn string_size(&self) -> usize {
+    pub fn string_size(&self) -> u8 {
         if self.check_flag(HeapSizes::STRING_FLAG) {
             4
         } else {
@@ -304,7 +306,7 @@ impl HeapSizes {
         }
     }
 
-    pub fn guid_size(&self) -> usize {
+    pub fn guid_size(&self) -> u8 {
         if self.check_flag(HeapSizes::GUID_FLAG) {
             4
         } else {
@@ -312,7 +314,7 @@ impl HeapSizes {
         }
     }
 
-    pub fn blob_size(&self) -> usize {
+    pub fn blob_size(&self) -> u8 {
         if self.check_flag(HeapSizes::BLOB_FLAG) {
             4
         } else {

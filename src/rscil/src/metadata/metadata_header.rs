@@ -1,5 +1,7 @@
 
-use super::PeParser;
+use std::io::BufRead;
+
+use super::*;
 
 /// # II.24.2 File headers
 /// ## II.24.2.1 Metadata root
@@ -34,16 +36,16 @@ pub struct MetadataHeader {
 }
 
 impl MetadataHeader {
-    pub fn from(buffer: &mut PeParser) -> Result<MetadataHeader, std::io::Error> {
-        let signature = buffer.read_u32()?;
+    pub fn from(buffer: &mut Buffer) -> Result<MetadataHeader, std::io::Error> {
+        let signature = buffer.read_u32::<LittleEndian>()?;
 
         // See Description of Signature field in the table above
         assert!(signature == 0x424A5342, "Invalid metadata signature: 0x{:X}", signature);
 
-        let major_version = buffer.read_u16()?;
-        let minor_version = buffer.read_u16()?;
-        let reserved = buffer.read_u32()?;
-        let length = buffer.read_u32()?;
+        let major_version = buffer.read_u16::<LittleEndian>()?;
+        let minor_version = buffer.read_u16::<LittleEndian>()?;
+        let reserved = buffer.read_u32::<LittleEndian>()?;
+        let length = buffer.read_u32::<LittleEndian>()?;
 
         let mut version = vec![0u8; length as usize];
         buffer.read_exact(&mut version)?;
@@ -52,8 +54,8 @@ impl MetadataHeader {
         let mut padding = vec![0u8; (length % 4) as usize];
         buffer.read_exact(&mut padding)?;
 
-        let flags = buffer.read_u16()?;
-        let streams = buffer.read_u16()?;
+        let flags = buffer.read_u16::<LittleEndian>()?;
+        let streams = buffer.read_u16::<LittleEndian>()?;
 
         let mut stream_headers = Vec::with_capacity(streams as usize);
         for _ in 0..streams {
@@ -91,9 +93,9 @@ pub struct StreamHeader {
 }
 
 impl StreamHeader {
-    pub fn from(buffer: &mut PeParser) -> Result<StreamHeader, std::io::Error> {
-        let offset = buffer.read_u32()?;
-        let size = buffer.read_u32()?;
+    pub fn from(buffer: &mut Buffer) -> Result<StreamHeader, std::io::Error> {
+        let offset = buffer.read_u32::<LittleEndian>()?;
+        let size = buffer.read_u32::<LittleEndian>()?;
 
         let mut name = Vec::new();
         buffer.read_until(0, &mut name)?;

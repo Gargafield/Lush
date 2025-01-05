@@ -1,4 +1,6 @@
 
+use super::*;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TableKind {
     /// # II.22.2 Assembly : 0x20
@@ -218,6 +220,15 @@ impl TableKind {
             TableKind::TypeDef => 0x02,
             TableKind::TypeRef => 0x01,
             TableKind::TypeSpec => 0x1b,
+        }
+    }
+
+    pub fn read(self, buffer: &mut Buffer, context: &TableDecodeContext) -> Result<CodedIndex, std::io::Error> {
+        if context.get_table_index_size(self) == 2 {
+            return Ok(CodedIndex::from(self, buffer.read_u16::<LittleEndian>()? as u32));
+        }
+        else {
+            return Ok(CodedIndex::from(self, buffer.read_u32::<LittleEndian>()?));
         }
     }
 }

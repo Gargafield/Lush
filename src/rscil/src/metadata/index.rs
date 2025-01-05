@@ -1,50 +1,47 @@
 
-use crate::*;
+use std::slice::Iter;
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct StringIndex(pub u32);
+use super::*;
 
-impl From<u32> for StringIndex {
-    fn from(value: u32) -> Self {
-        StringIndex(value)
-    }
+macro_rules! define_stream_index {
+    ($name:ident, $size_method:ident) => {
+        #[derive(Debug, Clone, Copy, PartialEq)]
+        pub struct $name(pub u32);
+
+        impl From<u32> for $name {
+            fn from(value: u32) -> Self {
+                $name(value)
+            }
+        }
+
+        impl $name {
+            /// # II.24.2.6 #~ stream 
+            /// 
+            /// [...]
+            /// 
+            /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
+            pub fn read(buffer: &mut Buffer, context: &TableDecodeContext) -> Result<$name, std::io::Error> {
+                if context.heap_sizes.$size_method() == 2 {
+                    return Ok($name::from(buffer.read_u16::<LittleEndian>()?));
+                }
+                else {
+                    return Ok($name::from(buffer.read_u32::<LittleEndian>()?));
+                }
+            }
+        }
+
+        impl From<u16> for $name {
+            fn from(value: u16) -> Self {
+                $name(value as u32)
+            }
+        }
+
+    };
 }
 
-impl From<u16> for StringIndex {
-    fn from(value: u16) -> Self {
-        StringIndex(value as u32)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct GuidIndex(pub u32);
-
-impl From<u32> for GuidIndex {
-    fn from(value: u32) -> Self {
-        GuidIndex(value)
-    }
-}
-
-impl From<u16> for GuidIndex {
-    fn from(value: u16) -> Self {
-        GuidIndex(value as u32)
-    }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BlobIndex(pub u32);
-
-impl From<u32> for BlobIndex {
-    fn from(value: u32) -> Self {
-        BlobIndex(value)
-    }
-}
-
-impl From<u16> for BlobIndex {
-    fn from(value: u16) -> Self {
-        BlobIndex(value as u32)
-    }
-}
+define_stream_index!(StringIndex, string_size);
+define_stream_index!(GuidIndex, guid_size);
+define_stream_index!(BlobIndex, blob_size);
 
 /// # II.24.2.6 #~ stream 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -408,6 +405,50 @@ impl CodedIndexTag {
             },
         }
     }
+
+    pub fn iter() -> Iter<'static, (CodedIndexTag, u8)> {
+        static ITER: [(CodedIndexTag, u8); 13] = [
+            (CodedIndexTag::TypeDefOrRef, 2),
+            (CodedIndexTag::HasConstant, 2),
+            (CodedIndexTag::HasCustomAttribute, 5),
+            (CodedIndexTag::HasFieldMarshal, 1),
+            (CodedIndexTag::HasDeclSecurity, 2),
+            (CodedIndexTag::MemberRefParent, 3),
+            (CodedIndexTag::HasSemantics, 1),
+            (CodedIndexTag::MethodDefOrRef, 1),
+            (CodedIndexTag::MemberForwarded, 1),
+            (CodedIndexTag::Implementation, 2),
+            (CodedIndexTag::CustomAttributeType, 3),
+            (CodedIndexTag::ResolutionScope, 2),
+            (CodedIndexTag::TypeOrMethodDef, 1),
+        ];
+        ITER.iter()
+    }
+
+    /// # II.24.2.6 #~ stream 
+    /// 
+    /// [...]
+    /// 
+    /// * If *e* is a *coded index* that points into table *t<sub>i</sub>* out of *n* possible tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, then it 
+    ///   is stored as e << (log n) | tag{*t<sub>0</sub>*, ...*t<sub>n-1</sub>*}[*t<sub>i</sub>] using 2 bytes if the maximum number 
+    ///   of rows of tables *t<sub>0</sub>*, ...*t<sub>n-1</sub>*, is less than 2<sup>(16 – (log n))</sup>, and using 4 bytes otherwise.
+    ///   The family of finite maps tag{*t<sub>0</sub>, ...*t<sub>n-1</sub>*} is defined below. Note that decoding a physical 
+    ///   row requires the inverse of this mapping. [For example, the Parent column of the 
+    ///   *Constant* table indexes a row in the *Field*, *Param*, or *Property* tables.  The actual 
+    ///   table is encoded into the low 2 bits of the number, using the values: 0 => *Field*, 1 => 
+    ///   *Param*, 2 => *Property*. The remaining bits hold the actual row number being 
+    ///   indexed. For example, a value of `0x321`, indexes row number `0xC8` in the *Param* table.]
+    pub fn read(self, buffer: &mut Buffer, context: &TableDecodeContext) -> Result<CodedIndex, std::io::Error> {
+        let index: u32 = if context.get_coded_index_size(self) == 4 {
+            buffer.read_u32::<LittleEndian>()?
+        } else {
+            buffer.read_u16::<LittleEndian>()? as u32
+        };
+
+        let data = index >> self.get_tag_size();
+        let table = self.get_table_kind((index & 0xff) as u8);
+        Ok(CodedIndex::from(table, data))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -447,6 +488,11 @@ impl MetadataToken {
             MetadataToken::UserString(index) => 0x70 << 24 | index,
             MetadataToken::Table(table, index) => table.to_u32() << 24 | index,
         }
+    }
+
+    pub fn read(buffer: &mut Buffer) -> Result<Self, std::io::Error> {
+        let raw = buffer.read_u32::<LittleEndian>()?;
+        Ok(MetadataToken::from_raw(raw))
     }
 }
 
