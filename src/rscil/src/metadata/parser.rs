@@ -121,12 +121,12 @@ impl PeParser {
 
     /// # II.25.3 Section headers 
     /// See [`SectionHeader`] struct for more information.
-    fn read_section_header(&mut self, header: &PeHeader) -> Result<Vec<section_header::SectionHeader>, std::io::Error> {
+    fn read_section_header(&mut self, header: &PeHeader) -> Result<Vec<SectionHeader>, std::io::Error> {
         let mut sections = Vec::with_capacity(header.number_of_sections as usize);
         for _ in 0..header.number_of_sections {
             let mut buffer = [0u8; 40];
             self.buffer.read_exact(&mut buffer)?;
-            sections.push(section_header::SectionHeader::from(&buffer));
+            sections.push(SectionHeader::from(&buffer));
         }
         Ok(sections)
     }
