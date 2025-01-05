@@ -4,6 +4,15 @@ use crate::{cast_table, AssemblyRow, ModuleRow, StringIndex};
 
 use super::*;
 
+macro_rules! define_getter {
+    ($name:ident, $table:ident, $row:ident) => {
+        pub fn $name(&self, index: u32) -> Option<$row> {
+            let table = cast_table!($table, self.streams.metadata.get_table(TableKind::$table));
+            table.get(index as usize).map(|x| *x)
+        }
+    };
+}
+
 pub struct PeImage {
     pub filename : String,
     pub cli_header: CliHeader,
@@ -26,7 +35,6 @@ impl PeImage {
         }
     }
 
-
     pub fn get_string(&self, index: StringIndex) -> &String {
         self.streams.strings.get(index.0).unwrap()
     }
@@ -39,10 +47,14 @@ impl PeImage {
         cast_table!(Module, self.streams.metadata.get_table(TableKind::Module))
     }
 
-    pub fn get_method_def(&self, index: u32) -> Option<MethodDefRow> {
-        let table = cast_table!(MethodDef, self.streams.metadata.get_table(TableKind::MethodDef));
-        table.get(index as usize).map(|x| *x)
-    }
+    define_getter!(get_method_def, MethodDef, MethodDefRow);
+    define_getter!(get_type_def, TypeDef, TypeDefRow);
+    define_getter!(get_type_ref, TypeRef, TypeRefRow);
+    define_getter!(get_field, Field, FieldRow);
+    define_getter!(get_param, Param, ParamRow);
+    define_getter!(get_interface_impl, InterfaceImpl, InterfaceImplRow);
+    define_getter!(get_member_ref, MemberRef, MemberRefRow);
+    define_getter!(get_assembly_ref, AssemblyRef, AssemblyRefRow);
 
     pub fn get_method_body(&mut self, method_index: u32) -> Result<&MethodBody, std::io::Error> {
         if self.methods.contains_key(&method_index) {

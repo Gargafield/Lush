@@ -8,18 +8,22 @@ mod tests {
 
     #[test]
     fn it_works() {
-        let mut image = PeParser::open("tests/HelloWorld.exe")
+        let image = PeParser::open("tests/HelloWorld.exe")
             .and_then(|parser| parser.read())
             .unwrap();
 
         let assembly = image.get_assembly().unwrap();
         dbg!(image.get_string(assembly.name));
 
-        let methods = cast_table!(MethodDef, image.streams.metadata.get_table(TableKind::MethodDef)).len();
-        for i in 0..methods {
-            let method = image.get_method_def(i as u32).unwrap();
-            dbg!(image.get_string(method.name));
-            dbg!(image.get_method_body(i as u32).unwrap());
-        }
+        let member = image.get_member_ref(2).unwrap();
+        dbg!(member);
+
+        let _type = image.get_type_ref(3).unwrap();
+        dbg!(_type);
+        dbg!(image.get_string(_type.type_name));
+        dbg!(image.get_string(_type.type_namespace));
+
+        let assembly_ref = image.get_assembly_ref(0).unwrap();
+        dbg!(image.get_string(assembly_ref.name));
     }
 }
