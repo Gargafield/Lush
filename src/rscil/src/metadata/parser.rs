@@ -174,9 +174,9 @@ impl PeParser {
     /// See [`MethodBody`]
     fn read_method_header(&mut self, rva: u32) -> Result<MethodBody, std::io::Error> {
         let position = self.seek_rva(rva);
-        let header = MethodHeaderType::from(self.buffer.read_u8()?);
+        let header = MethodHeaderType::new(self.buffer.read_u8()?);
         if header.is_tiny_format() {
-            Ok(MethodBody::tiny(header.0))
+            Ok(MethodBody::tiny(header.into()))
         }
         else if header.is_fat_format() {
             self.buffer.set_position(position);
