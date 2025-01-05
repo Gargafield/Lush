@@ -1,14 +1,13 @@
 use std::collections::HashMap;
 
-use crate::{cast_table, AssemblyRow, ModuleRow, StringIndex};
+use crate::{cast_row, AssemblyRow, ModuleRow, StringIndex};
 
 use super::*;
 
 macro_rules! define_getter {
     ($name:ident, $table:ident, $row:ident) => {
         pub fn $name(&self, index: u32) -> Option<$row> {
-            let table = cast_table!($table, self.streams.metadata.get_table(TableKind::$table));
-            table.get(index as usize).map(|x| *x)
+            cast_row!(Some(Row::$table), self.streams.metadata.get_table(TableKind::$table).get(index as usize))
         }
     };
 }
@@ -39,12 +38,20 @@ impl PeImage {
         self.streams.strings.get(index.0).unwrap()
     }
 
-    pub fn get_assembly(&self) -> &Option<AssemblyRow> {
-        cast_table!(Assembly, self.streams.metadata.get_table(TableKind::Assembly))
+    /// # II.22.2 Assembly : 0x20
+    /// [...]
+    /// 
+    /// 1. The Assembly table shall contain zero or one row [ERROR]
+    pub fn get_assembly(&self) -> Option<AssemblyRow> {
+        cast_row!(Some(Row::Assembly), self.streams.metadata.get_table(TableKind::Assembly).get(0))
     }
 
+    /// II.22.30 Module : 0x00
+    /// [...]
+    /// 
+    /// 1. The Module table shall contain one and only one row [ERROR] 
     pub fn get_module(&self) -> &ModuleRow {
-        cast_table!(Module, self.streams.metadata.get_table(TableKind::Module))
+        cast_row!(Row::Module, self.streams.metadata.get_table(TableKind::Module).get(0).unwrap())
     }
 
     define_getter!(get_method_def, MethodDef, MethodDefRow);

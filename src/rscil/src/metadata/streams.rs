@@ -255,7 +255,14 @@ impl MetadataStream {
         let context = TableDecodeContext::new(row_count, heap_sizes);
 
         for kind in table_kinds.iter() {
-            tables.insert(*kind, Table::read(buffer, *kind, &context)?);
+            let row_count = context.get_row_count(*kind);
+            let mut table = Vec::with_capacity(row_count as usize);
+
+            for _ in 0..row_count {
+                table.push(Row::read(buffer, *kind, &context)?);
+            }
+
+            tables.insert(*kind, table);
         }
 
         Ok(MetadataStream {
