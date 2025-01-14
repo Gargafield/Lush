@@ -108,11 +108,10 @@ impl BlobStream {
         while count < header.size {
             let (length, bytes_read) = read_blob_length(buffer)?;
 
-            let mut blob = vec![0u8; length as usize];
+            let mut blob = vec![0u8; length];
             buffer.read_exact(&mut blob).unwrap();
             blobs.insert(count, blob);
-            count += bytes_read as u32;
-            count += length as u32;
+            count += bytes_read + length as u32;
         }
         Ok(BlobStream(blobs))
     }
@@ -133,15 +132,12 @@ fn read_blob_length(buffer: &mut Buffer) -> Result<(usize, u32), std::io::Error>
     if first & 0b1000_0000 == 0 {
         Ok((first as usize, 1))
     } else if first & 0b1100_0000 == 0b1000_0000 {
-        let length = ((first & 0b0011_1111) as u32) << 8 + buffer.read_u8()? as u32;
+        let length = u16::from_be_bytes([first & 0b0011_1111, buffer.read_u8()?]);
         Ok((length as usize, 2))
     } else if first & 0b1110_0000 == 0b1100_0000 {
         let mut bytes = [0u8; 3];
         buffer.read_exact(&mut bytes).unwrap();
-        let length = ((first & 0b0001_1111) as u32) << 24
-            + (bytes[0] as u32) << 16
-            + (bytes[1] as u32) << 8
-            + (bytes[2] as u32);
+        let length = u32::from_be_bytes([first & 0b0001_1111, bytes[0], bytes[1], bytes[2]]);
         Ok((length as usize, 4))
     } else {
         Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "Invalid blob length"))
@@ -172,14 +168,13 @@ impl UserStringStream {
             let (length, bytes_read) = read_blob_length(buffer)?;
 
             // Read UTF-16 string
-            let mut string = vec![0u16; length / 2];
-            for i in 0..(length / 2) {
-                string[i] = buffer.read_u16::<LittleEndian>()?;
+            let mut string = vec![0u16; length >> 2];
+            for char in string.iter_mut().take(length >> 1) {
+                *char = buffer.read_u16::<LittleEndian>()?;
             }
 
             strings.insert(count, string);
-            count += bytes_read as u32;
-            count += length as u32;
+            count += bytes_read + length as u32;
         }
         Ok(UserStringStream(strings))
     }

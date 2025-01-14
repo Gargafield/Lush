@@ -44,10 +44,10 @@ impl TableDecodeContext {
     pub fn get_table_index_size(&self, kind: TableKind) -> u8 {
         let row_count = self.row_count.get(&kind).unwrap_or(&0);
         if *row_count < 0x10000 {
-            return 2;
+            2
         }
         else {
-            return 4;
+            4
         }
     }
 

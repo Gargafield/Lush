@@ -31,7 +31,7 @@ impl MethodBody {
         MethodBody {
             body: Vec::with_capacity(code_size as usize),
             max_stack: 8,
-            code_size: code_size,
+            code_size,
         }
     }
 
@@ -81,12 +81,12 @@ pub struct CodeMetadata {
 impl CodeMetadata {
     const fn new(code: Code, name: &'static str, operand_type: OperandType, stack_behaviour_pop: StackBehaviour, stack_behaviour_push: StackBehaviour, flow_control: FlowControl) -> CodeMetadata {
         CodeMetadata {
-            code: code,
-            name: name,
-            operand_type: operand_type,
-            stack_behaviour_pop: stack_behaviour_pop,
-            stack_behaviour_push: stack_behaviour_push,
-            flow_control: flow_control,
+            code,
+            name,
+            operand_type,
+            stack_behaviour_pop,
+            stack_behaviour_push,
+            flow_control,
         }
     }
 }

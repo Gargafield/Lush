@@ -41,9 +41,9 @@ macro_rules! flags {
             }
         }
 
-        impl Into<$size> for $name {
-            fn into(self) -> $size {
-                self.0
+        impl From<$name> for $size {
+            fn from(value: $name) -> $size {
+                value.0
             }
         }
     };

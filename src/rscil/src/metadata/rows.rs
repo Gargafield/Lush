@@ -7,10 +7,7 @@ use super::*;
 macro_rules! cast_row {
     (Some($row:path), $expr:expr) => {
         match $expr {
-            Some(x) => match x {
-                $row(x) => Some(*x),
-                _ => None
-            },
+            Some($row(x)) => Some(*x),
             _ => None
         }
     };

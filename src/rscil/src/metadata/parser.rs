@@ -190,7 +190,7 @@ impl PeParser {
     }
 
     pub fn get_position(&mut self) -> u64 {
-        self.buffer.seek(SeekFrom::Current(0)).unwrap()
+        self.buffer.stream_position().unwrap()
     }
 
     pub fn seek_position(&mut self, position: u64) {

@@ -225,10 +225,10 @@ impl TableKind {
 
     pub fn read(self, buffer: &mut Buffer, context: &TableDecodeContext) -> Result<CodedIndex, std::io::Error> {
         if context.get_table_index_size(self) == 2 {
-            return Ok(CodedIndex::from(self, buffer.read_u16::<LittleEndian>()? as u32));
+            Ok(CodedIndex::from(self, buffer.read_u16::<LittleEndian>()? as u32))
         }
         else {
-            return Ok(CodedIndex::from(self, buffer.read_u32::<LittleEndian>()?));
+            Ok(CodedIndex::from(self, buffer.read_u32::<LittleEndian>()?))
         }
     }
 }
