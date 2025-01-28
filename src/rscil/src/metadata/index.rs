@@ -14,13 +14,14 @@ macro_rules! define_stream_index {
             }
         }
 
-        impl $name {
+        impl TableDecode for $name {
+            type Output = $name;
             /// # II.24.2.6 #~ stream 
             /// 
             /// [...]
             /// 
             /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
-            pub fn read(buffer: &mut Buffer, context: &TableDecodeContext) -> Result<$name, std::io::Error> {
+            fn decode(context: &TableDecodeContext, buffer: &mut Buffer) -> Result<$name, std::io::Error> {
                 if context.heap_sizes.$size_method() == 2 {
                     return Ok($name::from(buffer.read_u16::<LittleEndian>()?));
                 }
@@ -143,6 +144,22 @@ pub enum CodedIndexTag {
     /// | `TypeDef`                            | 0   |
     /// | `MethodDef`                          | 1   |
     TypeOrMethodDef,
+}
+
+impl TableEnumDecode for CodedIndexTag {
+    type Output = CodedIndex;
+    
+    fn decode(self, context: &TableDecodeContext, buffer: &mut Buffer) -> Result<CodedIndex, std::io::Error> {
+        let index: u32 = if context.get_coded_index_size(self) == 4 {
+            buffer.read_u32::<LittleEndian>()?
+        } else {
+            buffer.read_u16::<LittleEndian>()? as u32
+        };
+
+        let data = index >> self.get_tag_size();
+        let table = self.get_table_kind((index & 0xff) as u8);
+        Ok(CodedIndex::from(table, data))
+    }
 }
 
 impl CodedIndexTag {
@@ -474,19 +491,19 @@ pub enum MetadataToken {
 
 impl MetadataToken {
     pub fn from_raw(raw: u32) -> Self {
-        let table = raw >> 24;
+        let table = (raw >> 24) as u8;
         let index = raw & 0x00FFFFFF;
 
         match table {
             0x70 => MetadataToken::UserString(index),
-            _ => MetadataToken::Table(TableKind::from_u32(table).unwrap(), index),
+            _ => MetadataToken::Table(TableKind::from(table), index),
         }
     }
 
     pub fn to_raw(&self) -> u32 {
         match self {
             MetadataToken::UserString(index) => 0x70 << 24 | index,
-            MetadataToken::Table(table, index) => table.to_u32() << 24 | index,
+            MetadataToken::Table(table, index) => (u8::from(*table) as u32) << 24 | index,
         }
     }
 

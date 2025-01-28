@@ -1,5 +1,8 @@
 #![allow(dead_code)]
 
+use super::*;
+use paste::paste;
+
 macro_rules! flags {
     ($name:ident { $($flag:ident = $value:expr),* $(,)? }) => {
         flags!($name : u16 { $($flag = $value),* });
@@ -46,7 +49,20 @@ macro_rules! flags {
                 value.0
             }
         }
+
+        impl TableDecode for $name {
+            type Output = Self;
+        
+            fn decode(_: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self, std::io::Error> {
+                paste! {
+                    let value = flags!(@read buffer $size);
+                    Ok(Self::new(value))
+                }
+            }
+        }
     };
+    (@read $buffer:ident u8) => { $buffer.read_u8()? };
+    (@read $buffer:ident $ty:ty) => { paste! { $buffer.[<read_ $ty:lower>]::<LittleEndian>()? } };
 }
 
 // II.23.1.2 Values for AssemblyFlags

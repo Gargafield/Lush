@@ -1,9 +1,13 @@
-use std::collections::HashMap;
+
+pub(crate) type Buffer = Cursor<Vec<u8>>;
+
+use std::{cell::RefCell, collections::HashMap};
 
 use super::*;
 
 pub struct TableDecodeContext {
     row_count: HashMap<TableKind, u32>,
+    index_tracker: RefCell<HashMap<TableKind, u32>>,
     pub heap_sizes: HeapSizes,
     coded_index_sizes: HashMap<CodedIndexTag, u8>,
 }
@@ -18,7 +22,15 @@ impl TableDecodeContext {
             row_count,
             heap_sizes,
             coded_index_sizes,
+            index_tracker: RefCell::new(HashMap::new()),
         }
+    }
+
+    pub fn get_index(&self, kind: TableKind) -> u32 {
+        let mut index_tracker = self.index_tracker.borrow_mut();
+        let index = *index_tracker.get(&kind).unwrap_or(&1);
+        index_tracker.insert(kind, index + 1);
+        index
     }
 
     fn compute_coded_index_sizes(row_count: &HashMap<TableKind, u32>) -> HashMap<CodedIndexTag, u8> {
@@ -59,3 +71,37 @@ impl TableDecodeContext {
         *self.coded_index_sizes.get(&tag).unwrap_or(&0)
     }
 }
+
+pub trait TableDecode : Sized {
+    type Output;
+
+    fn decode(context: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self::Output, std::io::Error>;
+}
+
+pub trait TableEnumDecode : Sized {
+    type Output;
+
+    fn decode(self, context: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self::Output, std::io::Error>;
+}
+
+impl TableDecode for u32 {
+    type Output = Self;
+    fn decode(_context: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self, std::io::Error> {
+        buffer.read_u32::<LittleEndian>()
+    }
+}
+
+impl TableDecode for u16 {
+    type Output = Self;
+    fn decode(_context: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self, std::io::Error> {
+        buffer.read_u16::<LittleEndian>()
+    }
+}
+
+impl TableDecode for u8 {
+    type Output = Self;
+    fn decode(_context: &TableDecodeContext, buffer: &mut Buffer) -> Result<Self, std::io::Error> {
+        buffer.read_u8()
+    }
+}
+

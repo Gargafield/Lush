@@ -15,15 +15,14 @@ mod tests {
         let assembly = image.get_assembly().unwrap();
         dbg!(image.get_string(assembly.name));
 
-        let member = image.get_member_ref(2).unwrap();
-        dbg!(member);
+        let entry_point_index = match image.cli_header.entry_point_token {
+            MetadataToken::Table(_, index) => index,
+            _ => panic!("Invalid entry point token"),
+        };
+        dbg!(entry_point_index);
 
-        let _type = image.get_type_ref(3).unwrap();
-        dbg!(_type);
-        dbg!(image.get_string(_type.type_name));
-        dbg!(image.get_string(_type.type_namespace));
+        let entry_point = image.get_method_body(entry_point_index).unwrap();
 
-        let assembly_ref = image.get_assembly_ref(0).unwrap();
-        dbg!(image.get_string(assembly_ref.name));
+        dbg!(entry_point);
     }
 }

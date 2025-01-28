@@ -1,13 +1,19 @@
 use std::collections::HashMap;
 
-use crate::{cast_row, AssemblyRow, ModuleRow, StringIndex};
+use crate::{cast_row, StringIndex};
 
 use super::*;
 
+// # II.22 Metadata logical format : tables
+//
+// [...]
+//
+// Indexes to tables begin at 1, so index 1 means the first row in any given metadata table.  (An index 
+// value of zero denotes that it does not index a row at all; that is, it behaves like a null reference.) 
 macro_rules! define_getter {
-    ($name:ident, $table:ident, $row:ident) => {
-        pub fn $name(&self, index: u32) -> Option<$row> {
-            cast_row!(Some(Row::$table), self.streams.metadata.get_table(TableKind::$table).get(index as usize))
+    ($name:ident, $row:ident) => {
+        pub fn $name(&self, index: u32) -> Option<&$row> {
+            self.streams.metadata.get_table(TableKind::$row).get(index as usize).map(|row| cast_row!(Row::$row, row))
         }
     };
 }
@@ -40,10 +46,10 @@ impl PeImage {
     fn construct_method_body_map(methods: &Table, buffer: &mut PeParser) -> HashMap<u32, MethodBody> {
         let mut map = HashMap::new();
         for (index, row) in methods.iter().enumerate() {
-            let method = cast_row!(Row::MethodDef, row);
-
-            let body = buffer.read_method_body(method.rva).unwrap();
-            map.insert(index as u32, body);
+            if let Some(method) = MethodDef::from_row(row) {
+                let body = buffer.read_method_body(method.rva).unwrap();
+                map.insert(index as u32, body);
+            }
         }
         map
     }
@@ -56,28 +62,28 @@ impl PeImage {
     /// [...]
     /// 
     /// 1. The Assembly table shall contain zero or one row [ERROR]
-    pub fn get_assembly(&self) -> Option<AssemblyRow> {
-        cast_row!(Some(Row::Assembly), self.streams.metadata.get_table(TableKind::Assembly).first())
+    pub fn get_assembly(&self) -> Option<&Assembly> {
+        self.streams.metadata.get_table(TableKind::Assembly).first().map(|row| cast_row!(Row::Assembly, row))
     }
 
     /// II.22.30 Module : 0x00
     /// [...]
     /// 
     /// 1. The Module table shall contain one and only one row [ERROR] 
-    pub fn get_module(&self) -> &ModuleRow {
-        cast_row!(Row::Module, self.streams.metadata.get_table(TableKind::Module).first().unwrap())
+    pub fn get_module(&self) -> &Module {
+        cast_row!(Some(Module), self.streams.metadata.get_table(TableKind::Module).first()).unwrap()
     }
 
-    define_getter!(get_method_def, MethodDef, MethodDefRow);
-    define_getter!(get_type_def, TypeDef, TypeDefRow);
-    define_getter!(get_type_ref, TypeRef, TypeRefRow);
-    define_getter!(get_field, Field, FieldRow);
-    define_getter!(get_param, Param, ParamRow);
-    define_getter!(get_interface_impl, InterfaceImpl, InterfaceImplRow);
-    define_getter!(get_member_ref, MemberRef, MemberRefRow);
-    define_getter!(get_assembly_ref, AssemblyRef, AssemblyRefRow);
+    define_getter!(get_method_def, MethodDef);
+    define_getter!(get_type_def, TypeDef);
+    define_getter!(get_type_ref, TypeRef);
+    define_getter!(get_field, Field);
+    define_getter!(get_param, Param);
+    define_getter!(get_interface_impl, InterfaceImpl);
+    define_getter!(get_member_ref, MemberRef);
+    define_getter!(get_assembly_ref, AssemblyRef);
 
     pub fn get_method_body(&self, method_index: u32) -> Option<&MethodBody> {
-        self.methods.get(&method_index)
+        self.methods.get(&(method_index - 1))
     }
 }
