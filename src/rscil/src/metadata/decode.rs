@@ -48,11 +48,13 @@ impl TableDecodeContext {
         coded_index_sizes
     }
 
-    /// # II.24.2.6 #~ stream 
+    /// # [II.24.2.6] #~ stream 
     /// 
     /// [...]
     /// 
     /// * If e is a simple index into a table with index i, it is stored using 2 bytes if table i has less than 2<sup>16</sup> rows, otherwise it is stored using 4 bytes. 
+    /// 
+    /// [II.24.2.6]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=299
     pub fn get_table_index_size(&self, kind: TableKind) -> u8 {
         let row_count = self.row_count.get(&kind).unwrap_or(&0);
         if *row_count < 0x10000 {

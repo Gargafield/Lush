@@ -4,7 +4,7 @@ use std::slice::Iter;
 use super::*;
 
 macro_rules! define_stream_index {
-    ($name:ident, $size_method:ident) => {
+    ($name:ident, $flag:path) => {
         #[derive(Debug, Clone, Copy, PartialEq)]
         pub struct $name(pub u32);
 
@@ -22,7 +22,7 @@ macro_rules! define_stream_index {
             /// 
             /// * If e is an index into the GUID heap, 'blob', or String heap, it is stored using the number of bytes as defined in the HeapSizes field.
             fn decode(context: &TableDecodeContext, buffer: &mut Buffer) -> Result<$name, std::io::Error> {
-                if context.heap_sizes.$size_method() == 2 {
+                if !context.heap_sizes.contains($flag) {
                     return Ok($name::from(buffer.read_u16::<LittleEndian>()?));
                 }
                 else {
@@ -40,9 +40,9 @@ macro_rules! define_stream_index {
     };
 }
 
-define_stream_index!(StringIndex, string_size);
-define_stream_index!(GuidIndex, guid_size);
-define_stream_index!(BlobIndex, blob_size);
+define_stream_index!(StringIndex, HeapSizes::STRING_FLAG);
+define_stream_index!(GuidIndex, HeapSizes::GUID_FLAG);
+define_stream_index!(BlobIndex, HeapSizes::BLOB_FLAG);
 
 /// # II.24.2.6 #~ stream 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]

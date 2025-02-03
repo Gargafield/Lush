@@ -13,6 +13,7 @@ macro_rules! table_kind_impl {
         #[repr(u8)]
         $visibility enum $name {
             $(
+                $(#[$($field_attr)*])*
                 $field = $value,
             )*
         }
@@ -45,7 +46,7 @@ table_kind_impl!{
     #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
     pub enum TableKind {
         /// # II.22.2 Assembly : 0x20
-        /// See [`AssemblyRow`]
+        /// See [`Assembly`]
         Assembly = 0x20,
         /// # II.22.3 AssemblyOS : 0x22
         /// [...]
@@ -57,7 +58,7 @@ table_kind_impl!{
         /// It should be ignored by the CLI.
         AssemblyProcessor = 0x21,
         /// # II.22.5 AssemblyRef : 0x23
-        /// See [`AssemblyRefRow`]
+        /// See [`AssemblyRef`]
         AssemblyRef = 0x23,
         /// # II.22.6 AssemblyRefOS : 0x25
         /// [...]
@@ -68,99 +69,99 @@ table_kind_impl!{
         /// They should be ignored by the CLI.
         AssemblyRefProcessor = 0x24,
         /// # II.22.8 ClassLayout : 0x0F
-        /// See [`ClassLayoutRow`]
+        /// See [`ClassLayout`]
         ClassLayout = 0x0F,
         /// II.22.9 Constant : 0x0B
-        /// See [`ConstantRow`]
+        /// See [`Constant`]
         Constant = 0x0B,
         /// # II.22.10 CustomAttribute : 0x0C
         CustomAttribute = 0x0C,
         /// # II.22.11 DeclSecurity : 0x0E
-        /// See [`DeclSecurityRow`]
+        /// See [`DeclSecurity`]
         DeclSecurity = 0x0E,
         /// # II.22.12 EventMap : 0x12
-        /// See [`EventMapRow`]
+        /// See [`EventMap`]
         EventMap = 0x12,
         /// # II.22.13 Event : 0x14
-        /// See [`EventRow`]
+        /// See [`Event`]
         Event = 0x14,
         /// # II.22.14 ExportedType : 0x27
-        /// See [`ExportedTypeRow`]
+        /// See [`ExportedType`]
         ExportedType = 0x27,
         /// # II.22.15 Field : 0x04
-        /// See [`FieldRow`]
+        /// See [`Field`]
         Field = 0x04,
         /// # II.22.16 FieldLayout : 0x10
-        /// See [`FieldLayoutRow`]
+        /// See [`FieldLayout`]
         FieldLayout = 0x10,
         /// # II.22.17 FieldMarshal : 0x0D
-        /// See [`FieldMarshalRow`]
+        /// See [`FieldMarshal`]
         FieldMarshal = 0x0D,
         /// # II.22.18 FieldRVA : 0x1D
-        /// See [`FieldRVARow`]
+        /// See [`FieldRVA`]
         FieldRVA = 0x1D,
         /// # II.22.19 File : 0x26
-        /// See [`FileRow`]
+        /// See [`File`]
         File = 0x26,
         /// # II.22.20 GenericParam : 0x2A
-        /// See [`GenericParamRow`]
+        /// See [`GenericParam`]
         GenericParam = 0x2A,
         /// # II.22.21 GenericParamConstraint : 0x2C
-        /// See [`GenericParamConstraintRow`]
+        /// See [`GenericParamConstraint`]
         GenericParamConstraint = 0x2C,
         /// # II.22.22 ImplMap : 0x1C
-        /// See [`ImplMapRow`]
+        /// See [`ImplMap`]
         ImplMap = 0x1C,
         /// # II.22.23 InterfaceImpl : 0x09
-        /// See [`InterfaceImplRow`]
+        /// See [`InterfaceImpl`]
         InterfaceImpl = 0x09,
         /// # II.22.24 ManifestResource : 0x28
-        /// See [`ManifestResourceRow`]
+        /// See [`ManifestResource`]
         ManifestResource = 0x28,
         /// # II.22.25 MemberRef : 0x0A 
-        /// See [`MemberRefRow`]
+        /// See [`MemberRef`]
         MemberRef = 0x0A,
         /// # II.22.26 MethodDef : 0x06
-        /// See [`MethodDefRow`]
+        /// See [`MethodDef`]
         MethodDef = 0x06,
         /// # II.22.27 MethodImpl : 0x19
-        /// See [`MethodImplRow`]
+        /// See [`MethodImpl`]
         MethodImpl = 0x19,
         /// # II.22.28 MethodSemantics : 0x18
-        /// See [`MethodSemanticsRow`]
+        /// See [`MethodSemantics`]
         MethodSemantics = 0x18,
         /// # II.22.29 MethodSpec : 0x2B
-        /// See [`MethodSpecRow`]
+        /// See [`MethodSpec`]
         MethodSpec = 0x2B,
         /// # II.22.30 Module : 0x00 
-        /// See [`ModuleRow`]
+        /// See [`Module`]
         Module = 0x00,
         /// # II.22.31 ModuleRef : 0x1A
-        /// See [`ModuleRefRow`]
+        /// See [`ModuleRef`]
         ModuleRef = 0x1A,
         /// # II.22.32 NestedClass : 0x29
-        /// See [`NestedClassRow`]
+        /// See [`NestedClass`]
         NestedClass = 0x29,
         /// II.22.33 Param : 0x08
-        /// See [`ParamRow`]
+        /// See [`Param`]
         Param = 0x08,
         /// # II.22.34 Property : 0x17
-        /// See [`PropertyRow`]
+        /// See [`Property`]
         Property = 0x17,
         /// # II.22.35 PropertyMap : 0x15
-        /// See [`PropertyMapRow`]
+        /// See [`PropertyMap`]
         PropertyMap = 0x15,
         /// # II.22.36 StandAloneSig : 0x11
-        /// See [`StandAloneSigRow`]
+        /// See [`StandAloneSig`]
         StandAloneSig = 0x11,
         /// # II.22.37 TypeDef : 0x02
-        /// See [`TypeDefRow`]
+        /// See [`TypeDef`]
         TypeDef = 0x02,
         /// # II.22.38 TypeRef : 0x01
-        /// See [`TypeRefRow`]
+        /// See [`TypeRef`]
         TypeRef = 0x01,
         /// # II.22.39 TypeSpec : 0x1B
-        /// See [`TypeSpecRow`]
+        /// See [`TypeSpec`]
         TypeSpec = 0x1B,
     }    
 }

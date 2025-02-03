@@ -14,7 +14,7 @@ use byteorder::{LittleEndian, ReadBytesExt};
 
 pub use kind::TableKind;
 pub use headers::*;
-pub use streams::{Streams, HeapSizes};
+pub use streams::Streams;
 pub use image::PeImage;
 pub use parser::PeParser;
 pub use rows::*;

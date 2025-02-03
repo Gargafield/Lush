@@ -2,7 +2,7 @@ use std::{collections::HashMap, io::BufRead};
 
 use super::*;
 
-/// II.24.2.2 Stream header 
+/// [II.24.2.2] Stream header 
 /// 
 /// [...]
 /// There are five possible kinds of streams. A stream 
@@ -12,6 +12,8 @@ use super::*;
 /// the blob heap, a stream header with name "#GUID" that points to the physical representation of the 
 /// GUID heap; and a stream header with name "#~" that points to the physical representation of a set of 
 /// tables. 
+/// 
+/// [II.24.2.2]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=298
 pub struct Streams {
     pub strings: StringStream,
     pub user_strings: UserStringStream,
@@ -49,21 +51,24 @@ impl Streams {
 
 
 
-/// # II.24.2.3 #Strings heap 
+/// # [II.24.2.3] #Strings heap 
 /// 
-/// The stream of bytes pointed to by a “#Strings” header is the physical representation of the logical string 
+/// The stream of bytes pointed to by a "#Strings" header is the physical representation of the logical string 
 /// heap. The physical heap can contain garbage, that is, it can contain parts that are unreachable from any 
 /// of the tables, but parts that are reachable from a table shall contain a valid null-terminated UTF8 string. 
-/// When the #String heap is present, the first entry is always the empty string (i.e., \0).
+/// When the #String heap is present, the first entry is always the empty string (i.e., `\0`).
 ///
 /// # II.22 Metadata logical format: tables 
 /// 
 /// [...]
 /// 
 /// Metadata is stored in two kinds of structure: tables (arrays of records) and heaps. There are four heaps 
-/// in any module: String, Blob, Userstring, and Guid.  The first three are byte arrays (so valid indexes into 
+/// in any module: String, Blob, Userstring, and Guid. The first three are byte arrays (so valid indexes into 
 /// these heaps might be 0, 23, 25, 39, etc). The Guid heap is an array of GUIDs, each 16 bytes wide. Its 
 /// first element is numbered 1, its second 2, and so on. 
+/// 
+/// [II.24.2.3]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=298
+/// [II.22]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=235
 pub struct StringStream(HashMap<u32, String>);
 
 impl StringStream {
@@ -85,20 +90,23 @@ impl StringStream {
     }
 }
 
-/// # II.24.2.4 #US and #Blob heaps
+/// # [II.24.2.4] #US and #Blob heaps
 /// 
 /// The stream of bytes pointed to by a "#US" or "#Blob" header are the physical representation of logical 
 /// Userstring and 'blob' heaps respectively. Both these heaps can contain garbage, as long as any part that 
 /// is reachable from any of the tables contains a valid 'blob'. Individual blobs are stored with their length 
 /// encoded in the first few bytes:
 /// 
-/// See [BlobStream::read_length].
+/// See [`BlobStream::read_length`].
 /// 
 /// The first entry in both these heaps is the empty 'blob' that consists of the single byte 0x00. 
 ///
-/// # II.22 Metadata logical format: tables 
+/// # [II.22] Metadata logical format: tables 
 /// 
 /// See [`StringStream`].
+/// 
+/// [II.24.2.4]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=298
+/// [II.22]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=235
 pub struct BlobStream(pub HashMap<u32, Vec<u8>>);
 
 impl BlobStream {
@@ -117,7 +125,7 @@ impl BlobStream {
     }
 }
 
-/// # II.24.2.4 #US and #Blob heaps
+/// # [II.24.2.4] #US and #Blob heaps
 /// 
 /// [...]
 /// 
@@ -126,6 +134,8 @@ impl BlobStream {
 /// * If the first four bytes of the 'blob' are *110bbbbb<sub>2</sub>*, *x*, *y*, and *z*, then the rest of the 'blob' contains the (*bbbbb<sub>2</sub>* << 24 + *x* << 16 + *y* << 8 + *z*) bytes of actual data. 
 ///
 /// Returns the length of the 'blob' and the number of bytes read from the buffer.
+/// 
+/// [II.24.2.4]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=298
 fn read_blob_length(buffer: &mut Buffer) -> Result<(usize, u32), std::io::Error> {
     let first = buffer.read_u8()?;
 
@@ -144,7 +154,7 @@ fn read_blob_length(buffer: &mut Buffer) -> Result<(usize, u32), std::io::Error>
     }
 }
 
-/// # II.24.2.4 #US and #Blob heaps
+/// # [II.24.2.4] #US and #Blob heaps
 /// 
 /// See [`BlobStream`].
 /// 
@@ -155,9 +165,12 @@ fn read_blob_length(buffer: &mut Buffer) -> Result<(usize, u32), std::io::Error>
 /// `0x08`, `0x0E`–`0x1F`, `0x27`, `0x2D`, `0x7F`.  Otherwise, it holds 0. The 1 signifies Unicode characters that 
 /// require handling beyond that normally provided for 8-bit encoding sets.
 ///
-/// # II.22 Metadata logical format: tables 
+/// # [II.22] Metadata logical format: tables 
 /// 
 /// See [`StringStream`].
+/// 
+/// [II.24.2.4]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=298
+/// [II.22]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=235
 pub struct UserStringStream(pub HashMap<u32, Vec<u16>>);
 
 impl UserStringStream {
@@ -182,18 +195,18 @@ impl UserStringStream {
 
 // TODO: Implement GUIDStream
 
-/// # II.24.2.6 #~ stream 
+/// # [II.24.2.6] #~ stream 
 /// 
 /// The "#~" streams contain the actual physical representations of the logical metadata tables (§II.22).
 /// A "#~" stream has the following top-level structure:
 /// 
 /// | Offset   | Size   | Field        | Description |
 /// | -------- | ------ | ------------ | ----------- |
-/// | 0        | 4      | Reserved     | Reserved, always 0 (§II.24.1) |
-/// | 4        | 1      | MajorVersion | Major version of table schemata; shall be 2 (§II.24.1) |
-/// | 5        | 1      | MinorVersion | Minor version of table schemata; shall be 0 (§II.24.1) 
+/// | 0        | 4      | Reserved     | Reserved, always 0 ([§II.24.1]) |
+/// | 4        | 1      | MajorVersion | Major version of table schemata; shall be 2 ([§II.24.1]) |
+/// | 5        | 1      | MinorVersion | Minor version of table schemata; shall be 0 ([§II.24.1]) 
 /// | 6        | 1      | HeapSizes    | Bit vector for heap sizes. |
-/// | 7        | 1      | Reserved     | Reserved, always 1 (§II.24.1) |
+/// | 7        | 1      | Reserved     | Reserved, always 1 ([§II.24.1]) |
 /// | 8        | 8      | Valid        | Bit vector of present tables, let n be the number of bits that are 1. |
 /// | 16       | 8      | Sorted       | Bit vector of sorted tables. |
 /// | 24       | 4**n*  | Rows         | Array of n 4-byte unsigned integers indicating the number of rows for each present table. |
@@ -209,6 +222,9 @@ impl UserStringStream {
 /// the Rows array.
 /// 
 /// [...]
+/// 
+/// [II.24.2.6]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=299
+/// [§II.24.1]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=297
 pub struct MetadataStream {
     pub major_version: u8,
     pub minor_version: u8,
@@ -254,7 +270,9 @@ impl MetadataStream {
             let mut table = Vec::with_capacity(row_count as usize);
 
             for _ in 0..row_count {
-                table.push(Row::read(buffer, *kind, &context)?);
+                let row = Row::read(buffer, *kind, &context)?;
+                dbg!(row);
+                table.push(row);
             }
 
             tables.insert(*kind, table);
@@ -274,58 +292,4 @@ impl MetadataStream {
     pub fn get_table(&self, kind: TableKind) -> &Table {
         self.tables.get(&kind).unwrap()
     }
-}
-
-/// # II.24.2.6 #~ stream 
-/// [...]
-/// 
-/// The HeapSizes field is a bitvector that encodes the width of indexes into the various heaps.  If bit 0 is 
-/// set, indexes into the “#String” heap are 4 bytes wide; if bit 1 is set, indexes into the “#GUID” heap are 
-/// 4 bytes wide; if bit 2 is set, indexes into the “#Blob” heap are 4 bytes wide.  Conversely, if the 
-/// HeapSize bit for a particular heap is not set, indexes into that heap are 2 bytes wide. 
-/// | Heap size flag | Description | 
-/// | -------------- | ----------- |
-/// | `0x01`         | Size of "#String" stream >= 216. |
-/// | `0x02`         | Size of "#GUID" stream >= 216. |
-/// | `0x04`         | Size of "#Blob" stream >= 216. |
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub struct HeapSizes(u8);
-
-impl HeapSizes {
-    pub const STRING_FLAG: u8 = 0b0000_0001;
-    pub const GUID_FLAG: u8 = 0b0000_0010;
-    pub const BLOB_FLAG: u8 = 0b0000_0100;
-
-    pub fn from(value: u8) -> HeapSizes {
-        HeapSizes(value)
-    }
-
-    pub fn string_size(&self) -> u8 {
-        if self.check_flag(HeapSizes::STRING_FLAG) {
-            4
-        } else {
-            2
-        }
-    }
-
-    pub fn guid_size(&self) -> u8 {
-        if self.check_flag(HeapSizes::GUID_FLAG) {
-            4
-        } else {
-            2
-        }
-    }
-
-    pub fn blob_size(&self) -> u8 {
-        if self.check_flag(HeapSizes::BLOB_FLAG) {
-            4
-        } else {
-            2
-        }
-    }
-
-    pub fn check_flag(&self, flag: u8) -> bool {
-        self.0 & flag == flag
-    }
-    
 }

@@ -81,10 +81,12 @@ impl PeParser {
         ))
     }
 
-    /// # II.25.2.1 MS-DOS header
+    /// # [II.25.2.1] MS-DOS header
     /// The PE format starts with an MS-DOS stub of exactly the following **128** bytes to be placed at the front 
     /// of the module. At offset `0x3c` in the DOS header is a 4-byte unsigned integer offset, `lfanew`, to the PE 
     /// signature (shall be "PE\0\0"), immediately followed by the PE file header.
+    /// 
+    /// [II.25.2.1]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=304
     fn read_dos_stub(&mut self) -> Result<(), std::io::Error> {
         let mut header = [0u8; DOS_STUB_SIZE];
         self.buffer.read_exact(&mut header)?;
@@ -208,7 +210,7 @@ impl PeParser {
         Ok(Code::from(&[op1, op2]))
     }
 
-    /// II.25 File format extensions to PE 
+    /// # [II.25] File format extensions to PE 
     /// 
     /// [...]
     /// 
@@ -218,6 +220,8 @@ impl PeParser {
     /// position within the file on disk. To compute the file position of an item with RVA r, search all the 
     /// sections in the PE file to find the section with RVA s, length l and file position p in which the RVA 
     /// lies, ie s  r < s+l. The file position of the item is then given by p+(r-s). 
+    /// 
+    /// [II.25]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=303
     fn seek_rva(&mut self, rva: u32) -> u64 {
         self.buffer.seek(SeekFrom::Start(self.get_address(rva))).unwrap()
     }

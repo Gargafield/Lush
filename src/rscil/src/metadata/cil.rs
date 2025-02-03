@@ -12,7 +12,7 @@ pub struct MethodBody {
 }
 
 impl MethodBody {
-    /// # II.25.4.2 Tiny format 
+    /// # [II.25.4.2](https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=311) Tiny format 
     ///
     /// Tiny headers use a 6-bit length encoding. The following is true for all tiny headers: 
     /// * No local variables are allowed 
@@ -24,7 +24,7 @@ impl MethodBody {
     /// 
     /// | Start Bit | Count of Bits | Description |
     /// | --------- |- ------------ | ----------- |
-    /// | 0         | 2             | Flags ([`CorILMethod_TinyFormat`] shall be set, see §II.25.4.4). |
+    /// | 0         | 2             | Flags ([`MethodHeaderType::COR_IL_METHOD_TINY_FORMAT`] shall be set, see §II.25.4.4). |
     /// | 2         | 6             | Size, in bytes, of the method body immediately following this header. |
     pub fn tiny(byte: u8) -> MethodBody {
         let code_size = (byte >> 2) as u32;
@@ -35,7 +35,7 @@ impl MethodBody {
         }
     }
 
-    /// # II.25.4.3 Fat format 
+    /// # [II.25.4.3] Fat format 
     /// 
     /// [...]
     /// 
@@ -43,11 +43,14 @@ impl MethodBody {
     /// 
     /// | Offset    | Size      | **Field**          | Description |
     /// | --------- | --------- | ------------------ |-------------|
-    /// | 0         | 12 (bits) | **Flags**          | Flags (CorILMethod_FatFormat shall be set in bits 0:1, see §II.25.4.4) |
+    /// | 0         | 12 (bits) | **Flags**          | Flags ([`MethodHeaderType::COR_IL_METHOD_FAT_FORMAT`] shall be set in bits 0:1, see §[II.25.4.4]) |
     /// | 12 (bits) | 4 (bits)  | **Size**           | Size of this header expressed as the count of 4-byte integers occupied (currently 3) |
     /// | 2         | 2         | **MaxStack**       | Maximum number of items on the operand stack |
     /// | 4         | 4         | **CodeSize**       | Size in bytes of the actual method body |
     /// | 8         | 4         | **LocalVarSigTok** | Meta Data token for a signature describing the layout of the local variables for the method. 0 means there are no local variables present |
+    /// 
+    /// [II.25.4.3]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=311
+    /// [II.25.4.4]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=311
     pub fn fat(bytes: &[u8]) -> MethodBody {
         let _flags: u16 = u16::from_le_bytes([bytes[0], bytes[1]]);
         let max_stack :u16 = u16::from_le_bytes([bytes[2], bytes[3]]);

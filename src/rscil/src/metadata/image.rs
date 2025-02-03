@@ -4,16 +4,21 @@ use crate::{cast_row, StringIndex};
 
 use super::*;
 
-// # II.22 Metadata logical format : tables
+// # [II.22] Metadata logical format : tables
 //
 // [...]
 //
 // Indexes to tables begin at 1, so index 1 means the first row in any given metadata table.  (An index 
 // value of zero denotes that it does not index a row at all; that is, it behaves like a null reference.) 
+//
+// [II.22]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=235
 macro_rules! define_getter {
     ($name:ident, $row:ident) => {
         pub fn $name(&self, index: u32) -> Option<&$row> {
-            self.streams.metadata.get_table(TableKind::$row).get(index as usize).map(|row| cast_row!(Row::$row, row))
+            if (index == 0) {
+                return None;
+            }
+            self.streams.metadata.get_table(TableKind::$row).get((index - 1) as usize).map(|row| cast_row!(Row::$row, row))
         }
     };
 }
@@ -45,10 +50,10 @@ impl PeImage {
 
     fn construct_method_body_map(methods: &Table, buffer: &mut PeParser) -> HashMap<u32, MethodBody> {
         let mut map = HashMap::new();
-        for (index, row) in methods.iter().enumerate() {
+        for (_, row) in methods.iter().enumerate() {
             if let Some(method) = MethodDef::from_row(row) {
                 let body = buffer.read_method_body(method.rva).unwrap();
-                map.insert(index as u32, body);
+                map.insert(method.index, body);
             }
         }
         map
@@ -58,18 +63,22 @@ impl PeImage {
         self.streams.strings.get(index.0).unwrap()
     }
 
-    /// # II.22.2 Assembly : 0x20
+    /// # [II.22.2] Assembly : 0x20
     /// [...]
     /// 
     /// 1. The Assembly table shall contain zero or one row [ERROR]
+    /// 
+    /// [II.22.2]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=237
     pub fn get_assembly(&self) -> Option<&Assembly> {
         self.streams.metadata.get_table(TableKind::Assembly).first().map(|row| cast_row!(Row::Assembly, row))
     }
 
-    /// II.22.30 Module : 0x00
+    /// # [II.22.30] Module : 0x00
     /// [...]
     /// 
     /// 1. The Module table shall contain one and only one row [ERROR] 
+    /// 
+    /// [II.22.30]: https://www.ecma-international.org/wp-content/uploads/ECMA-335_6th_edition_june_2012.pdf#page=265
     pub fn get_module(&self) -> &Module {
         cast_row!(Some(Module), self.streams.metadata.get_table(TableKind::Module).first()).unwrap()
     }
@@ -84,6 +93,6 @@ impl PeImage {
     define_getter!(get_assembly_ref, AssemblyRef);
 
     pub fn get_method_body(&self, method_index: u32) -> Option<&MethodBody> {
-        self.methods.get(&(method_index - 1))
+        self.methods.get(&method_index)
     }
 }
