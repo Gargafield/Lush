@@ -270,9 +270,7 @@ impl MetadataStream {
             let mut table = Vec::with_capacity(row_count as usize);
 
             for _ in 0..row_count {
-                let row = Row::read(buffer, *kind, &context)?;
-                dbg!(row);
-                table.push(row);
+                table.push(Row::read(buffer, *kind, &context)?);
             }
 
             tables.insert(*kind, table);
